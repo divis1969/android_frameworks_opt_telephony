@@ -45,6 +45,10 @@ import com.android.internal.telephony.uicc.IccCardProxy;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.util.IndentingPrintWriter;
 
+import com.mediatek.internal.telephony.worldphone.IWorldPhone;
+import com.mediatek.internal.telephony.worldphone.WorldPhoneUtil;
+import com.mediatek.internal.telephony.worldphone.WorldPhoneWrapper;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.HashMap;
@@ -79,6 +83,8 @@ public class PhoneFactory {
     static private Context sContext;
 
     static private final HashMap<String, LocalLog>sLocalLogs = new HashMap<String, LocalLog>();
+    // MTK
+    static private IWorldPhone sWorldPhone = null;
 
     //***** Class Methods
 
@@ -241,6 +247,10 @@ public class PhoneFactory {
                         sProxyPhones[i].setPreferredNetworkType(userNwType, null);
                     }
                 }
+                // MTK
+                if (WorldPhoneUtil.isWorldPhoneSupport()) {
+                    sWorldPhone = WorldPhoneWrapper.getWorldPhoneInstance();
+                }
             }
         }
     }
@@ -260,6 +270,14 @@ public class PhoneFactory {
                     sCommandsInterfaces[phoneId], sPhoneNotifier, phoneId);
             return phone;
         }
+    }
+
+    public static IWorldPhone getWorldPhone() {
+        if (sWorldPhone == null) {
+            Rlog.d(LOG_TAG, "sWorldPhone is null");
+        }
+
+        return sWorldPhone;
     }
 
     private static <T> T instantiateCustomRIL(
