@@ -3443,7 +3443,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 if (RILJ_LOGD) unsljLogRet(response, ret);
 
                 // Initial conditions
-                setRadioPower(false, null);
+                // setRadioPower(false, null);
                 if (needsOldRilFeature("setPrefNwTypeOnUnsolConnected")) {
                     setPreferredNetworkType(mPreferredNetworkType, null);
                 }
