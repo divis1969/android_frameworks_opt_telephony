@@ -2094,4 +2094,7 @@ public interface CommandsInterface {
      * @param h Handler to be removed from the registrant list.
      */
     public void unregisterForPhoneRatFamilyChanged(Handler h);
+
+    public void setInitialAttachApn(String apn, String protocol, int authType, String username,
+            String password, String operatorNumeric, boolean canHandleIms, Message result);
 }
