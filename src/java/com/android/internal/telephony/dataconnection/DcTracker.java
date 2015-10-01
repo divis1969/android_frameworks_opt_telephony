@@ -81,6 +81,9 @@ import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.util.AsyncChannel;
 import com.android.internal.util.ArrayUtils;
 
+// MTK
+import com.mediatek.internal.telephony.dataconnection.FdManager;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -172,6 +175,9 @@ public class DcTracker extends DcTrackerBase {
     private boolean mDeregistrationAlarmState = false;
     private PendingIntent mImsDeregistrationDelayIntent = null;
 
+    // MTK
+    protected FdManager mFdMgr;
+
     /** MMS Data Profile Device Override */
     private static final int MMS_DATA_PROFILE = SystemProperties.getInt(
             "ro.telephony.mms_data_profile", RILConstants.DATA_PROFILE_DEFAULT);
@@ -197,6 +203,9 @@ public class DcTracker extends DcTrackerBase {
             filter.addAction(INTENT_RESTART_TRYSETUP_ALARM + '.' + apnContext.getApnType());
             mPhone.getContext().registerReceiver(mIntentReceiver, filter, null, mPhone);
         }
+
+        // MTK Fast Dormancy
+        mFdMgr = FdManager.getInstance(p);
 
         // Add Emergency APN to APN setting list by default to support EPDN in sim absent cases
         initEmergencyApnSetting();
