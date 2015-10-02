@@ -781,6 +781,7 @@ public class DcTracker extends DcTrackerBase {
         }
 
         if (r != null) {
+            log("isDataAllowed mIccRecords=IccRecords {" + r.toString() + "}");
             recordsLoaded = r.getRecordsLoaded();
             if (DBG && !recordsLoaded) log("isDataAllowed getRecordsLoaded=" + recordsLoaded);
         }

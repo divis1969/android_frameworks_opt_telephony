@@ -1796,6 +1796,16 @@ public final class SimulatedCommands extends BaseCommands
     // MTK additions
 
     @Override
+    public void iccGetATR(Message response) {
+        unimplemented(response);
+    }
+
+    @Override
+    public void iccOpenChannelWithSw(String AID, Message response) {
+        unimplemented(response);
+    }
+
+    @Override
     public void setTrm(int mode, Message result) {
     }
 
