@@ -110,6 +110,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mNeighboringInfoRegistrants = new RegistrantList();
     protected RegistrantList mNetworkInfoRegistrants = new RegistrantList();
     protected RegistrantList mPlmnChangeNotificationRegistrant = new RegistrantList();
+    protected RegistrantList mPsNetworkStateRegistrants = new RegistrantList();
     protected Registrant mRegistrationSuspendedRegistrant;
     // M: fast dormancy.
     protected Registrant mScriResultRegistrant;
@@ -1068,6 +1069,16 @@ public abstract class BaseCommands implements CommandsInterface {
 
     public void unregisterForCommonSlotNoChanged(Handler h) {
         mCommonSlotNoChangedRegistrants.remove(h);
+    }
+
+    public void registerForPsNetworkStateChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+
+        mPsNetworkStateRegistrants.add(r);
+    }
+
+    public void unregisterForPsNetworkStateChanged(Handler h) {
+        mPsNetworkStateRegistrants.remove(h);
     }
 
     public void registerForNeighboringInfo(Handler h, int what, Object obj) {
