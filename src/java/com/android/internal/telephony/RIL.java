@@ -294,6 +294,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
     // save the status of screen
     private boolean isScreenOn = true;
 
+    // DS: MTK
+    private Handler mSupportedRafHandler;
+
     //***** Events
 
     static final int EVENT_SEND                 = 1;
@@ -663,6 +666,20 @@ public class RIL extends BaseCommands implements CommandsInterface {
         mPreferredNetworkType = preferredNetworkType;
         mPhoneType = RILConstants.NO_PHONE;
         mInstanceId = instanceId;
+
+        mSupportedRafHandler = new Handler() {
+            public void handleMessage(Message message) {
+                AsyncResult asyncResult = (AsyncResult)message.obj;
+                RadioCapability radioCapability = (RadioCapability)asyncResult.result;
+                if (asyncResult.exception != null) {
+                    riljLog("Get supported radio access family fail");
+                }
+                else {
+                    mSupportedRaf = radioCapability.getRadioAccessFamily();
+                    riljLog("Supported radio access family=" + mSupportedRaf);
+                }
+            }
+        };
 
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, RILJ_LOG_TAG);
@@ -2825,6 +2842,10 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_GET_HARDWARE_CONFIG: ret = responseHardwareConfig(p); break;
             case RIL_REQUEST_SIM_AUTHENTICATION: ret =  responseICC_IOBase64(p); break;
             case RIL_REQUEST_SHUTDOWN: ret = responseVoid(p); break;
+            // DS: MTK
+            case RIL_REQUEST_GET_RADIO_CAPABILITY: ret = responseRadioCapability(p); break;
+            case RIL_REQUEST_SET_RADIO_CAPABILITY: ret = responseRadioCapability(p); break;
+            case RIL_REQUEST_RESUME_REGISTRATION: ret =  responseVoid(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             //break;
@@ -3029,6 +3050,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_ON_SS: ret =  responseSsData(p); break;
             case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: ret =  responseString(p); break;
             case RIL_UNSOL_STK_SEND_SMS_RESULT: ret = responseInts(p); break; // Samsung STK
+
+            // DS: MTK:
+            case RIL_UNSOL_RADIO_CAPABILITY: ret = responseRadioCapability(p); break;
 
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
@@ -3395,6 +3419,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_RIL_CONNECTED: {
                 if (RILJ_LOGD) unsljLogRet(response, ret);
 
+                getRadioCapability(mSupportedRafHandler.obtainMessage());
                 // Set ecc list before MO call
                 if  (TelephonyManager.getDefault().getMultiSimConfiguration() == TelephonyManager.MultiSimVariants.DSDA
                         || mInstanceId == 0) {
@@ -3473,6 +3498,13 @@ public class RIL extends BaseCommands implements CommandsInterface {
                     }
                 }
                 break;
+
+            case RIL_UNSOL_RADIO_CAPABILITY: {
+                this.unsljLogRet(response, ret);
+                if (mPhoneRadioCapabilityChangedRegistrants != null) {
+                    mPhoneRadioCapabilityChangedRegistrants.notifyRegistrants(new AsyncResult((Object)null, ret, (Throwable)null));
+                }
+            }
         }
     }
 
@@ -3915,6 +3947,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 	      dataCall.suggestedRetryTime = p.readInt();
             dataCall.cid = p.readInt();
             dataCall.active = p.readInt();
+            dataCall.mtu = p.readInt(); // DS: MTK
             dataCall.type = p.readString();
             dataCall.ifname = p.readString();
             if ((dataCall.status == DcFailCause.NONE.getErrorCode()) &&
@@ -4497,8 +4530,8 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_GET_HARDWARE_CONFIG: return "GET_HARDWARE_CONFIG";
             case RIL_REQUEST_SIM_AUTHENTICATION: return "RIL_REQUEST_SIM_AUTHENTICATION";
             case RIL_REQUEST_SHUTDOWN: return "RIL_REQUEST_SHUTDOWN";
-            case RIL_REQUEST_SET_PHONE_RAT_FAMILY: return "RIL_REQUEST_SET_PHONE_RAT_FAMILY";
-            case RIL_REQUEST_GET_PHONE_RAT_FAMILY: return "RIL_REQUEST_GET_PHONE_RAT_FAMILY";
+            // DS: case RIL_REQUEST_SET_PHONE_RAT_FAMILY: return "RIL_REQUEST_SET_PHONE_RAT_FAMILY";
+            // DS: case RIL_REQUEST_GET_PHONE_RAT_FAMILY: return "RIL_REQUEST_GET_PHONE_RAT_FAMILY";
 
             /* M: call control part start */
             case RIL_REQUEST_HANGUP_ALL: return "HANGUP_ALL";
@@ -4626,7 +4659,11 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_SET_VIA_TRM: return "RIL_REQUEST_SET_VIA_TRM";
             case RIL_REQUEST_SET_ARSI_THRESHOLD: return "RIL_REQUEST_SET_ARSI_THRESHOLD";
             /* M: C2K part end */
-            default: return "<unknown request>";
+            // DS: MTK
+            case RIL_REQUEST_GET_RADIO_CAPABILITY: return "RIL_REQUEST_GET_RADIO_CAPABILITY";
+            case RIL_REQUEST_SET_RADIO_CAPABILITY: return "RIL_REQUEST_SET_RADIO_CAPABILITY";
+            case RIL_REQUEST_RESUME_REGISTRATION: return "RIL_REQUEST_RESUME_REGISTRATION";
+            default: return "<unknown request> (" + request + ")";
         }
     }
 
@@ -5617,4 +5654,37 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
         send(rr);
     }
+
+    // DS: MTK
+    @Override
+    public void getRadioCapability(Message message) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_RADIO_CAPABILITY, message);
+        riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        send(rr);
+    }
+
+    @Override
+    public void setRadioCapability(RadioCapability radioCapability, Message message) {
+        final RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_RADIO_CAPABILITY, message);
+        rr.mParcel.writeInt(radioCapability.getVersion());
+        rr.mParcel.writeInt(radioCapability.getSession());
+        rr.mParcel.writeInt(radioCapability.getPhase());
+        rr.mParcel.writeInt(radioCapability.getRadioAccessFamily());
+        rr.mParcel.writeString(radioCapability.getLogicalModemUuid());
+        rr.mParcel.writeInt(radioCapability.getStatus());
+        riljLog(rr.serialString() + "> " + requestToString(rr.mRequest) + " " + radioCapability.toString());
+        send(rr);
+    }
+
+    protected Object responseRadioCapability(Parcel parcel) {
+        int version = parcel.readInt();
+        int session = parcel.readInt();
+        int phase = parcel.readInt();
+        int rat = parcel.readInt();
+        String uuid = parcel.readString();
+        int status = parcel.readInt();
+        riljLog("responseRadioCapability: version= " + version + ", session=" + session + ", phase=" + phase + ", rat=" + rat + ", logicModemUuid=" + uuid + ", status=" + status);
+        return new RadioCapability(mInstanceId, session, phase, rat, uuid, status);
+    }
+
 }

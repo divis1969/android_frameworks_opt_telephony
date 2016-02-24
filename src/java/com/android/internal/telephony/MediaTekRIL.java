@@ -750,8 +750,8 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_GET_HARDWARE_CONFIG: ret = responseHardwareConfig(p); break;
             case RIL_REQUEST_SIM_AUTHENTICATION: ret =  responseICC_IOBase64(p); break;
             case RIL_REQUEST_SHUTDOWN: ret = responseVoid(p); break;
-            case RIL_REQUEST_GET_PHONE_RAT_FAMILY: ret =  responseInts(p); break;
-            case RIL_REQUEST_SET_PHONE_RAT_FAMILY: ret =  responsePhoneId(); break;
+            //case RIL_REQUEST_GET_PHONE_RAT_FAMILY: ret =  responseInts(p); break;
+            //case RIL_REQUEST_SET_PHONE_RAT_FAMILY: ret =  responsePhoneId(); break;
 
             /* M: call control part start */
             case RIL_REQUEST_HANGUP_ALL: ret =  responseVoid(p); break;
@@ -890,6 +890,11 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_SET_VIA_TRM: ret = responseVoid(p); break;
             case RIL_REQUEST_SET_ARSI_THRESHOLD: ret =  responseVoid(p); break;
             /* M: C2K part end */
+            // DS: MTK
+            case RIL_REQUEST_GET_RADIO_CAPABILITY: ret = responseRadioCapability(p); break;
+            case RIL_REQUEST_SET_RADIO_CAPABILITY: ret = responseRadioCapability(p); break;
+            case RIL_REQUEST_RESUME_REGISTRATION: ret =  responseVoid(p); break;
+
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             //break;
@@ -948,12 +953,12 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
                     }
                     break;
 
-                case RIL_REQUEST_SET_PHONE_RAT_FAMILY:
-                    if (RILJ_LOGD) {
-                        riljLog("Set phone RAT failed, send response with phone ID");
-                    }
-                    ret = responsePhoneId();
-                    break;
+//                case RIL_REQUEST_SET_PHONE_RAT_FAMILY:
+//                    if (RILJ_LOGD) {
+//                        riljLog("Set phone RAT failed, send response with phone ID");
+//                    }
+//                    ret = responsePhoneId();
+//                    break;
             }
 
             rr.onError(error, ret);
@@ -1430,8 +1435,8 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_GET_HARDWARE_CONFIG: return "GET_HARDWARE_CONFIG";
             case RIL_REQUEST_SIM_AUTHENTICATION: return "RIL_REQUEST_SIM_AUTHENTICATION";
             case RIL_REQUEST_SHUTDOWN: return "RIL_REQUEST_SHUTDOWN";
-            case RIL_REQUEST_SET_PHONE_RAT_FAMILY: return "RIL_REQUEST_SET_PHONE_RAT_FAMILY";
-            case RIL_REQUEST_GET_PHONE_RAT_FAMILY: return "RIL_REQUEST_GET_PHONE_RAT_FAMILY";
+//            case RIL_REQUEST_SET_PHONE_RAT_FAMILY: return "RIL_REQUEST_SET_PHONE_RAT_FAMILY";
+//            case RIL_REQUEST_GET_PHONE_RAT_FAMILY: return "RIL_REQUEST_GET_PHONE_RAT_FAMILY";
 
             /* M: call control part start */
             case RIL_REQUEST_HANGUP_ALL: return "HANGUP_ALL";
@@ -1561,6 +1566,10 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_SET_VIA_TRM: return "RIL_REQUEST_SET_VIA_TRM";
             case RIL_REQUEST_SET_ARSI_THRESHOLD: return "RIL_REQUEST_SET_ARSI_THRESHOLD";
             /* M: C2K part end */
+            // DS: MTK
+            case RIL_REQUEST_GET_RADIO_CAPABILITY: return "RIL_REQUEST_GET_RADIO_CAPABILITY";
+            case RIL_REQUEST_SET_RADIO_CAPABILITY: return "RIL_REQUEST_SET_RADIO_CAPABILITY";
+            case RIL_REQUEST_RESUME_REGISTRATION: return "RIL_REQUEST_RESUME_REGISTRATION";
             default: return "<unknown request> (" + request + ")";
         }
     }

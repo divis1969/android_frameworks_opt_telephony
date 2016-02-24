@@ -1612,4 +1612,28 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone.unregisterForPhoneRatFamilyChanged(h);
     }
 
+    // DS: MTK
+    public int getRadioAccessFamily() {
+        return mActivePhone.getRadioAccessFamily();
+    }
+
+    public void setRadioAccessFamily(int radioAccessFamily) {
+        mActivePhone.setRadioAccessFamily(radioAccessFamily);
+    }
+
+    @Override
+    public void setRadioCapability(RadioCapability radioCapability, Message message) {
+        mActivePhone.setRadioCapability(radioCapability, message);
+    }
+
+    @Override
+    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o) {
+        mActivePhone.registerForRadioCapabilityChanged(handler, n, o);
+    }
+
+    @Override
+    public void unregisterForRadioCapabilityChanged(Handler handler) {
+        mActivePhone.unregisterForRadioCapabilityChanged(handler);
+    }
+
 }

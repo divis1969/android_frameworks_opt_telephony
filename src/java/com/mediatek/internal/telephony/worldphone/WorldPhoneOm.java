@@ -143,7 +143,10 @@ public class WorldPhoneOm extends Handler implements IWorldPhone {
         intentFilter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
         intentFilter.addAction(ACTION_SHUTDOWN_IPO);
         intentFilter.addAction(ACTION_ADB_SWITCH_MODEM);
-        intentFilter.addAction(TelephonyIntents.ACTION_SET_PHONE_RAT_FAMILY_DONE);
+        //intentFilter.addAction(TelephonyIntents.ACTION_SET_PHONE_RAT_FAMILY_DONE);
+        intentFilter.addAction(TelephonyIntents.ACTION_SET_RADIO_CAPABILITY_DONE);
+        intentFilter.addAction(TelephonyIntents.ACTION_RADIO_TECHNOLOGY_CHANGED);
+        //intentFilter.addAction("android.intent.action.ACTION_TEST_WORLDPHOE");
         if (sDefultPhone != null) {
             sContext = sDefultPhone.getContext();
         } else {
@@ -324,10 +327,14 @@ public class WorldPhoneOm extends Handler implements IWorldPhone {
                         sFirstSelect[i] = true;
                     }
                 }
-            } else if (action.equals(TelephonyIntents.ACTION_SET_PHONE_RAT_FAMILY_DONE)) {
+            }/* else if (action.equals(TelephonyIntents.ACTION_SET_PHONE_RAT_FAMILY_DONE)) {
                 if (sMajorSim != AUTO_SWITCH_OFF) {
                     sMajorSim = WorldPhoneUtil.getMajorSim();
                 }
+                handleSimSwitched();
+            }*/
+            else if (action.equals(TelephonyIntents.ACTION_SET_RADIO_CAPABILITY_DONE)) {
+                sMajorSim = WorldPhoneUtil.getMajorSim();
                 handleSimSwitched();
             }
             logd("[Receiver]-");
