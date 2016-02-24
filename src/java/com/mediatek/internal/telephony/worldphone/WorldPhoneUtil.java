@@ -47,6 +47,7 @@ import com.android.internal.telephony.PhoneBase;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.PhoneFactory;
 import com.android.internal.telephony.PhoneProxy;
+import com.android.internal.telephony.ProxyController;
 import com.android.internal.telephony.TelephonyProperties;
 
 
@@ -81,20 +82,21 @@ public class WorldPhoneUtil implements IWorldPhone {
     }
 
     public static int getMajorSim() {
-        if (sProxyPhones == null) {
-            logd("[getMajorSim] sProxyPhones = null");
-            return DEFAULT_MAJOR_SIM;
-        }
-        for (int i = 0; i < PROJECT_SIM_NUM; i++) {
-            if ((((PhoneBase) sActivePhones[i]).getPhoneRatFamily()
-                    & PhoneRatFamily.PHONE_RAT_FAMILY_3G) == PhoneRatFamily.PHONE_RAT_FAMILY_3G) {
-                logd("[getMajorSim]: " + i);
-                return i;
+        int n = -99;
+        if (!ProxyController.getInstance().isCapabilitySwitching()) {
+            String value = SystemProperties.get("persist.radio.simswitch", "");
+            if (value != null && !value.equals("")) {
+                logd("[getMajorSim]: " + (Integer.parseInt(value) - 1));
+                n = Integer.parseInt(value) - 1;
+            }
+            else {
+                logd("[getMajorSim]: fail to get major SIM");
             }
         }
-        logd("[getMajorSim]: fail to get major SIM");
-
-        return DEFAULT_MAJOR_SIM;
+        else {
+            logd("[getMajorSim]: radio capability is switching");
+        }
+        return n;
     }
 
     public static int getModemSelectionMode() {

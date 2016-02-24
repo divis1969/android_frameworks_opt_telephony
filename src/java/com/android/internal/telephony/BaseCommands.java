@@ -115,6 +115,10 @@ public abstract class BaseCommands implements CommandsInterface {
     // M: fast dormancy.
     protected Registrant mScriResultRegistrant;
 
+    // DS: MTK
+    protected RegistrantList mPhoneRadioCapabilityChangedRegistrants = new RegistrantList();
+    protected int mSupportedRaf = 1;
+
     // Preferred network type received from PhoneFactory.
     // This is used when establishing a connection to the
     // vendor ril so it starts up in the correct mode.
@@ -1150,5 +1154,29 @@ public abstract class BaseCommands implements CommandsInterface {
     }
 
     public void setFDMode(int mode, int parameter1, int parameter2, Message response){
+    }
+
+    // DS: MTK
+    @Override
+    public int getSupportedRadioAccessFamily() {
+        return mSupportedRaf;
+    }
+
+    @Override
+    public void getRadioCapability(Message result) {
+    }
+
+    @Override
+    public void setRadioCapability(RadioCapability caps, Message result) {
+    }
+
+    @Override
+    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o) {
+        mPhoneRadioCapabilityChangedRegistrants.add(new Registrant(handler, n, o));
+    }
+
+    @Override
+    public void unregisterForRadioCapabilityChanged(Handler handler) {
+        this.mPhoneRadioCapabilityChangedRegistrants.remove(handler);
     }
 }

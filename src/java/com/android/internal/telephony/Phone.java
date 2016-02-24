@@ -2193,4 +2193,12 @@ public interface Phone {
      * @param h Handler to be removed from the registrant list.
      */
     public void unregisterForPhoneRatFamilyChanged(Handler h);
+
+    // DS: MTK
+    public int getRadioAccessFamily();
+    public void setRadioAccessFamily(int radioAccessFamily);
+    public void setRadioCapability(RadioCapability caps, Message result);
+    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o);
+    public void unregisterForRadioCapabilityChanged(Handler handler);
+
 }

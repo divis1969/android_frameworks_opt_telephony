@@ -2291,4 +2291,12 @@ public interface CommandsInterface {
     void setFDMode(int mode, int parameter1, int parameter2, Message response);
     public void setScriResult(Handler h, int what, Object obj);
     public void unSetScriResult(Handler h);
+
+    // DS: MTK
+    public int getSupportedRadioAccessFamily();
+    public void getRadioCapability(Message result);
+    public void setRadioCapability(RadioCapability caps, Message result);
+    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o);
+    public void unregisterForRadioCapabilityChanged(Handler handler);
+
 }

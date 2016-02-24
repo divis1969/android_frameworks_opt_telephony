@@ -75,12 +75,16 @@ public class ModemSwitchHandler {
     private static Phone[] sActivePhones = new Phone[PROJECT_SIM_NUM];
     private static Context sContext = null;
     private static CommandsInterface[] sCi = new CommandsInterface[PROJECT_SIM_NUM];
+    private static Phone[] sSvlteLtePhone = new Phone[ModemSwitchHandler.PROJECT_SIM_NUM];
+    private static CommandsInterface[] sSvlteLteCi = new CommandsInterface[ModemSwitchHandler.PROJECT_SIM_NUM];
 
     public ModemSwitchHandler() {
         logd("Constructor invoked");
         logd("Init modem type: " + sCurrentModemType);
         sProxyPhones = PhoneFactory.getPhones();
         for (int i = 0; i < PROJECT_SIM_NUM; i++) {
+            sSvlteLtePhone[i] = null;
+            sSvlteLteCi[i] = null;
             sActivePhones[i] = ((PhoneProxy) sProxyPhones[i]).getActivePhone();
             sCi[i] = ((PhoneBase) sActivePhones[i]).mCi;
         }
@@ -116,7 +120,7 @@ public class ModemSwitchHandler {
      *                  6 : switch to TDD CSFB(MD_TYPE_LTG)
      */
     public static void switchModem(CommandsInterface ci, int modemType) {
-        logd("[switchModem]");
+        logd("[switchModem] " + modemType);
         if (modemType == sCurrentModemType) {
             if (modemType == MD_TYPE_WG) {
                 logd("Already in WG modem");
@@ -134,13 +138,19 @@ public class ModemSwitchHandler {
             return;
         }
         if (modemType == MD_TYPE_WG) {
-            ci.setTrm(9, null);
+            //ci.setTrm(9, null);
+            logd("Ignore modem type:" + modemType);
+            return;
         } else if (modemType == MD_TYPE_TG) {
-            ci.setTrm(10, null);
+            logd("Ignore modem type:" + modemType);
+            return;
+            //ci.setTrm(10, null);
         } else if (modemType == MD_TYPE_LWG) {
             ci.setTrm(11, null);
         } else if (modemType == MD_TYPE_LTG) {
-            ci.setTrm(12, null);
+            logd("Ignore modem type:" + modemType);
+            return;
+            //ci.setTrm(12, null);
         } else {
             logd("Invalid modem type:" + modemType);
             return;
@@ -179,19 +189,22 @@ public class ModemSwitchHandler {
      *                  6 : reload TDD CSFB(MD_TYPE_LTG)
      */
     public static void reloadModem(CommandsInterface ci, int modemType) {
-        logd("[reloadModem]");
+        logd("[reloadModem]:" + modemType);
         if (ci.getRadioState() == CommandsInterface.RadioState.RADIO_UNAVAILABLE) {
             logd("Radio unavailable, can not reload modem");
             return;
         }
         if (modemType == MD_TYPE_WG) {
-            ci.setTrm(14, null);
+            logd("Ignore modem type:" + modemType);
+            //ci.setTrm(14, null);
         } else if (modemType == MD_TYPE_TG) {
-            ci.setTrm(15, null);
+            logd("Ignore modem type:" + modemType);
+            //ci.setTrm(15, null);
         } else if (modemType == MD_TYPE_LWG) {
             ci.setTrm(16, null);
         } else if (modemType == MD_TYPE_LTG) {
-            ci.setTrm(17, null);
+            logd("Ignore modem type:" + modemType);
+            //ci.setTrm(17, null);
         } else {
             logd("Invalid modem type:" + modemType);
         }

@@ -288,6 +288,9 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected int mPhoneRatFamily = PhoneRatFamily.PHONE_RAT_FAMILY_NONE;
 
 
+    // MTK
+    protected int mRadioAccessFamily = 1; // TODO: replace with named constant
+
     @Override
     public String getPhoneName() {
         return mName;
@@ -731,6 +734,18 @@ public abstract class PhoneBase extends Handler implements Phone {
                     mPhoneRatFamily = rat.getRatFamily();
                 }
                 mPhoneRatFamilyChangedRegistrants.notifyRegistrants((AsyncResult) msg.obj);
+                break;
+
+            case EVENT_GET_RADIO_CAPABILITY:
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception != null) {
+                    Rlog.d("PhoneBase", "get phone radio capability fail,no need to change mRadioAccessFamily");
+                }
+                else {
+                    RadioCapability radioCapability = (RadioCapability)ar.result;
+                    mRadioAccessFamily = radioCapability.getRadioAccessFamily();
+                    Rlog.d("PhoneBase", "EVENT_GET_RADIO_CAPABILITY :phone " + mPhoneId + ", RAF : " + mRadioAccessFamily);
+                }
                 break;
 
             default:
@@ -2937,4 +2952,27 @@ public abstract class PhoneBase extends Handler implements Phone {
         throw new CallStateException("addParticipant is not supported in this phone "
                 + this);
     }
+
+    // DS: MTK
+    public int getRadioAccessFamily() {
+        return mRadioAccessFamily;
+    }
+
+    public void setRadioAccessFamily(final int mRadioAccessFamily) {
+        Rlog.w("PhoneBase", "setRadioAccessFamily: " + mRadioAccessFamily);
+        this.mRadioAccessFamily = mRadioAccessFamily;
+    }
+
+    public void setRadioCapability(RadioCapability radioCapability, Message message) {
+        mCi.setRadioCapability(radioCapability, message);
+    }
+
+    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o) {
+        mCi.registerForRadioCapabilityChanged(handler, n, o);
+    }
+
+    public void unregisterForRadioCapabilityChanged(Handler handler) {
+        mCi.unregisterForRadioCapabilityChanged(this);
+    }
+
 }
