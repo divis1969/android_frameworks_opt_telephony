@@ -1507,14 +1507,23 @@ public class GSMPhone extends PhoneBase {
         boolean isUssdRequest;
         boolean isUssdRelease;
 
+        // MTK-specific handling of NW_RELEASE
+        // Note: we assume NW_RELEASE with non-empty message is the
+        // correct USSD completion, so onUssdFinished should be called for
+        // a pending MMI.
+        // In contrast, MTK uses a newly introduced flag (mIsNetworkInitiatedUssd)
+        // to handle this case.
+        boolean noMessage = (ussdMessage == null);
+
         isUssdRequest
             = (ussdMode == CommandsInterface.USSD_MODE_REQUEST);
 
+        isUssdRelease = ((ussdMode == CommandsInterface.USSD_MODE_NW_RELEASE) && noMessage);
+
         isUssdError
             = (ussdMode != CommandsInterface.USSD_MODE_NOTIFY
-                && ussdMode != CommandsInterface.USSD_MODE_REQUEST);
-
-        isUssdRelease = (ussdMode == CommandsInterface.USSD_MODE_NW_RELEASE);
+                && ussdMode != CommandsInterface.USSD_MODE_REQUEST
+                && ussdMode != CommandsInterface.USSD_MODE_NW_RELEASE);
 
         // See comments in GsmMmiCode.java
         // USSD requests aren't finished until one
