@@ -42,6 +42,7 @@ import android.telephony.CellIdentityCdma;
 import android.telephony.CellInfo;
 import android.telephony.CellInfoCdma;
 import android.telephony.DataConnectionRealTimeInfo;
+import android.telephony.PhoneRatFamily;
 import android.telephony.VoLteServiceState;
 import android.telephony.Rlog;
 import android.telephony.ServiceState;
@@ -179,7 +180,21 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected static final int EVENT_SET_CALL_FORWARD_TIMER_DONE    = 37;
     protected static final int EVENT_GET_CALL_FORWARD_TIMER_DONE    = 38;
     protected static final int EVENT_GET_CALLFORWARDING_STATUS      = 39;
-    protected static final int EVENT_LAST                   = EVENT_GET_CALLFORWARDING_STATUS;
+    // MTK
+    protected static final int EVENT_GET_PHONE_RAT_FAMILY              = 41;
+    protected static final int EVENT_PHONE_RAT_FAMILY_CHANGED_NOTIFY   = 42;
+    protected static final int EVENT_LAST                   = EVENT_PHONE_RAT_FAMILY_CHANGED_NOTIFY;
+
+    // MTK again - wtf
+    /// M: c2k modify, event constants. @{
+    protected static final int EVENT_SET_MEID_DONE                  = 101;
+    protected static final int EVENT_RUIM_READY                     = 102;
+    /// @}
+
+    /** M: for suspend data during plmn list */
+    protected static final int EVENT_GET_AVAILABLE_NETWORK_DONE = 500520;
+    protected static final int EVENT_DC_SWITCH_STATE_CHANGE = 500521;
+    protected static final int EVENT_GET_AVAILABLE_NETWORK = 500522;
 
     // For shared prefs.
     private static final String GSM_ROAMING_LIST_OVERRIDE_PREFIX = "gsm_roaming_list_";
@@ -251,6 +266,12 @@ public abstract class PhoneBase extends Handler implements Phone {
     private final Object mImsLock = new Object();
     private boolean mImsServiceReady = false;
     protected static ImsPhone mImsPhone = null;
+
+    // give the empty phone RAT family at initial, we will update it when radio available
+    protected int mPhoneRatFamily = PhoneRatFamily.PHONE_RAT_FAMILY_NONE;
+
+    // MTK
+    protected int mRadioAccessFamily = 1; // TODO: replace with named constant
 
     @Override
     public String getPhoneName() {
@@ -349,6 +370,9 @@ public abstract class PhoneBase extends Handler implements Phone {
     protected final RegistrantList mVideoCapabilityChangedRegistrants
             = new RegistrantList();
 
+    // MTK
+    protected final RegistrantList mPhoneRatFamilyChangedRegistrants
+            = new RegistrantList();
 
     protected Looper mLooper; /* to insure registrants are in correct thread*/
 
@@ -605,6 +629,31 @@ public abstract class PhoneBase extends Handler implements Phone {
                     mNotifier.notifyOemHookRawEventForSubscriber(getSubId(), data);
                 } else {
                     Rlog.e(LOG_TAG, "OEM hook raw exception: " + ar.exception);
+                }
+                break;
+
+            case EVENT_PHONE_RAT_FAMILY_CHANGED_NOTIFY:
+                ar = (AsyncResult) msg.obj;
+                Rlog.d(LOG_TAG, "Event EVENT_PHONE_RAT_FAMILY_CHANGED_NOTIFY "
+                        + mPhoneRatFamilyChangedRegistrants.size());
+                if (ar.exception == null) {
+                    PhoneRatFamily rat = (PhoneRatFamily)(ar.result);
+                    Rlog.d(LOG_TAG, "update mPhoneRatFamily, "
+                        + mPhoneRatFamilyChangedRegistrants.size() + ", " + rat);
+                    mPhoneRatFamily = rat.getRatFamily();
+                }
+                mPhoneRatFamilyChangedRegistrants.notifyRegistrants((AsyncResult) msg.obj);
+                break;
+
+            case EVENT_GET_RADIO_CAPABILITY:
+                ar = (AsyncResult)msg.obj;
+                if (ar.exception != null) {
+                    Rlog.d("PhoneBase", "get phone radio capability fail,no need to change mRadioAccessFamily");
+                }
+                else {
+                    RadioCapability radioCapability = (RadioCapability)ar.result;
+                    mRadioAccessFamily = radioCapability.getRadioAccessFamily();
+                    Rlog.d("PhoneBase", "EVENT_GET_RADIO_CAPABILITY :phone " + mPhoneId + ", RAF : " + mRadioAccessFamily);
                 }
                 break;
 
@@ -2338,6 +2387,32 @@ public abstract class PhoneBase extends Handler implements Phone {
                 + this);
     }
 
+    // MTK additions
+
+    @Override
+    public void setPhoneRatFamily(int ratFamily, Message response) {
+        mCi.setPhoneRatFamily(ratFamily, response);
+    }
+
+    @Override
+    public int getPhoneRatFamily() {
+        Rlog.d(LOG_TAG, "getPhoneRatFamily:ID:" + mPhoneId + ", RAT:" + mPhoneRatFamily);
+        return mPhoneRatFamily;
+    }
+
+    @Override
+    public void registerForPhoneRatFamilyChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mPhoneRatFamilyChangedRegistrants.add(r);
+        mCi.registerForPhoneRatFamilyChanged(this, EVENT_PHONE_RAT_FAMILY_CHANGED_NOTIFY, null);
+    }
+
+    @Override
+    public void unregisterForPhoneRatFamilyChanged(Handler h) {
+        mPhoneRatFamilyChangedRegistrants.remove(h);
+        mCi.unregisterForPhoneRatFamilyChanged(this);
+    }
+
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println("PhoneBase: subId=" + getSubId());
         pw.println(" mPhoneId=" + mPhoneId);
@@ -2416,4 +2491,27 @@ public abstract class PhoneBase extends Handler implements Phone {
         throw new CallStateException("addParticipant is not supported in this phone "
                 + this);
     }
+
+    // DS: MTK
+    public int getRadioAccessFamily() {
+        return mRadioAccessFamily;
+    }
+
+    public void setRadioAccessFamily(final int mRadioAccessFamily) {
+        Rlog.w("PhoneBase", "setRadioAccessFamily: " + mRadioAccessFamily);
+        this.mRadioAccessFamily = mRadioAccessFamily;
+    }
+
+    public void setRadioCapability(RadioCapability radioCapability, Message message) {
+        mCi.setRadioCapability(radioCapability, message);
+    }
+
+    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o) {
+        mCi.registerForRadioCapabilityChanged(handler, n, o);
+    }
+
+    public void unregisterForRadioCapabilityChanged(Handler handler) {
+        mCi.unregisterForRadioCapabilityChanged(this);
+    }
+
 }

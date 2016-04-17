@@ -98,7 +98,19 @@ public class UiccCard {
     private static final int EVENT_CARRIER_PRIVILIGES_LOADED = 20;
     private static final int EVENT_SIM_GET_ATR_DONE = 21;
 
+    // MTK
+    private static final int EVENT_GET_ATR_DONE = 100;
+    private static final int EVENT_OPEN_CHANNEL_WITH_SW_DONE = 101;
+
     private int mPhoneId;
+
+    // MTK
+    static final String[] UICCCARD_PROPERTY_RIL_UICC_TYPE = {
+        "gsm.ril.uicctype",
+        "gsm.ril.uicctype.2",
+        "gsm.ril.uicctype.3",
+        "gsm.ril.uicctype.4",
+    };
 
     public UiccCard(Context c, CommandsInterface ci, IccCardStatus ics, int phoneId) {
         mCardState = ics.mCardState;
@@ -371,6 +383,9 @@ public class UiccCard {
                 case EVENT_TRANSMIT_APDU_BASIC_CHANNEL_DONE:
                 case EVENT_SIM_IO_DONE:
                 case EVENT_SIM_GET_ATR_DONE:
+                // MTK
+                case EVENT_GET_ATR_DONE:
+                case EVENT_OPEN_CHANNEL_WITH_SW_DONE:
                     AsyncResult ar = (AsyncResult)msg.obj;
                     if (ar.exception != null) {
                        if (DBG)
@@ -705,5 +720,97 @@ public class UiccCard {
                     + ((Registrant)mCarrierPrivilegeRegistrants.get(i)).getHandler());
         }
         pw.flush();
+    }
+
+    // MTK additions
+
+    public int getSlotId() {
+        return mPhoneId;
+    }
+
+    public UiccCard(Context c, CommandsInterface ci, IccCardStatus ics, int slotId, boolean isUpdateSiminfo) {
+        if (DBG) log("Creating simId " + slotId + ",isUpdateSiminfo" + isUpdateSiminfo);
+        mCardState = ics.mCardState;
+        mPhoneId = slotId;
+        update(c, ci, ics, isUpdateSiminfo);
+    }
+
+    public void exchangeSimIo(int fileID, int command,
+                                           int p1, int p2, int p3, String pathID, String data, String pin2, Message onComplete) {
+        mCi.iccIO(command, fileID, pathID, p1, p2, p3, data, pin2,
+              mHandler.obtainMessage(EVENT_SIM_IO_DONE, onComplete));
+    }
+
+    public void iccGetAtr(Message onComplete) {
+        mCi.iccGetATR(mHandler.obtainMessage(EVENT_GET_ATR_DONE, onComplete));
+    }
+
+    public String getIccCardType() {
+        final String mIccType = SystemProperties.get(UICCCARD_PROPERTY_RIL_UICC_TYPE[mPhoneId]);
+        if (DBG) log("getIccCardType(): iccType = " + mIccType);
+        return mIccType;
+    }
+
+    public void iccOpenChannelWithSw(String AID, Message onComplete) {
+        mCi.iccOpenChannelWithSw(AID,
+            mHandler.obtainMessage(EVENT_OPEN_CHANNEL_WITH_SW_DONE, onComplete));
+    }
+
+    public void update(Context c, CommandsInterface ci, IccCardStatus ics, boolean isUpdateSimInfo) {
+        synchronized (mLock) {
+            if (mDestroyed) {
+                loge("Updated after destroyed! Fix me!");
+                return;
+            }
+            CardState oldState = mCardState;
+            mCardState = ics.mCardState;
+            mUniversalPinState = ics.mUniversalPinState;
+            mGsmUmtsSubscriptionAppIndex = ics.mGsmUmtsSubscriptionAppIndex;
+            mCdmaSubscriptionAppIndex = ics.mCdmaSubscriptionAppIndex;
+            mImsSubscriptionAppIndex = ics.mImsSubscriptionAppIndex;
+            mContext = c;
+            mCi = ci;
+            //update applications
+            if (DBG) log(ics.mApplications.length + " applications");
+            for (int i = 0; i < mUiccApplications.length; i++) {
+                if (mUiccApplications[i] == null) {
+                    //Create newly added Applications
+                    if (i < ics.mApplications.length) {
+                        mUiccApplications[i] = new UiccCardApplication(this,
+                                ics.mApplications[i], mContext, mCi);
+                    }
+                } else if (i >= ics.mApplications.length) {
+                    //Delete removed applications
+                    mUiccApplications[i].dispose();
+                    mUiccApplications[i] = null;
+                } else {
+                    //Update the rest
+                    mUiccApplications[i].update(ics.mApplications[i], mContext, mCi);
+                }
+            }
+
+            createAndUpdateCatService();
+            sanitizeApplicationIndexes();
+
+            RadioState radioState = mCi.getRadioState();
+            if (DBG) log("update: radioState=" + radioState + " mLastRadioState="
+                    + mLastRadioState + "isUpdateSimInfo= " + isUpdateSimInfo);
+            // No notifications while radio is off or we just powering up
+            if (isUpdateSimInfo) {
+                if (radioState == RadioState.RADIO_ON && mLastRadioState == RadioState.RADIO_ON) {
+                    if (oldState != CardState.CARDSTATE_ABSENT &&
+                            mCardState == CardState.CARDSTATE_ABSENT) {
+                        if (DBG) log("update: notify card removed");
+                        mAbsentRegistrants.notifyRegistrants();
+                        mHandler.sendMessage(mHandler.obtainMessage(EVENT_CARD_REMOVED, null));
+                    } else if (oldState == CardState.CARDSTATE_ABSENT &&
+                            mCardState != CardState.CARDSTATE_ABSENT) {
+                        if (DBG) log("update: notify card added");
+                        mHandler.sendMessage(mHandler.obtainMessage(EVENT_CARD_ADDED, null));
+                    }
+                }
+            }
+            mLastRadioState = radioState;
+        }
     }
 }

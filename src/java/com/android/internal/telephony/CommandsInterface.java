@@ -114,6 +114,19 @@ public interface CommandsInterface {
     static final int CDMA_SMS_FAIL_CAUSE_OTHER_TERMINAL_PROBLEM     = 39;
     static final int CDMA_SMS_FAIL_CAUSE_ENCODING_PROBLEM           = 96;
 
+    //MTK AT CMD +ESMLCK
+    static final int CAT_NETWOEK                = 0;
+    static final int CAT_NETOWRK_SUBSET         = 1;
+    static final int CAT_SERVICE_PROVIDER       = 2;
+    static final int CAT_CORPORATE              = 3;
+    static final int CAT_SIM                    = 4;
+
+    static final int OP_UNLOCK                  = 0;
+    static final int OP_LOCK                    = 1;
+    static final int OP_ADD                     = 2;
+    static final int OP_REMOVE                  = 3;
+    static final int OP_PERMANENT_UNLOCK        = 4;
+
     //***** Methods
     RadioState getRadioState();
 
@@ -2018,4 +2031,240 @@ public interface CommandsInterface {
      */
     void setOnCatSendSmsResult(Handler h, int what, Object obj);
     void unSetOnCatSendSmsResult(Handler h);
+
+    // MTK additions
+
+    //MTK-START multiple application support
+    /**
+     * M: Open application in the UICC
+     *
+     * @param application: application ID
+     * @param response The message to send.
+     */
+    public void openIccApplication(int application, Message response);
+
+    /**
+     * Query application status
+     *
+     * @param sessionId: The channel ID
+     * @param response The message to send.
+     */
+    public void getIccApplicationStatus(int sessionId, Message result);
+
+    /**
+     * parameters equivalent to 27.007 AT+CRLA command
+     * channel is used to assign which application to get EF file.
+     * response.obj will be an AsyncResult
+     * response.obj.userObj will be a IccIoResult on success
+     */
+    void iccIOForAppEx(int command, int fileid, String path, int p1, int p2, int p3,
+            String data, String pin2, String aid, int channel, Message response);
+
+    /**
+     * Register the handler for event notifications for sessionid of an application changed event.
+     *
+     * @param h Handler for notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void registerForSessionChanged(Handler h, int what, Object obj);
+
+    /**
+     * Unregister the handler for event notifications for sessionid of an application changed event.
+     *
+     * @param h Handler for notification message.
+     */
+    void unregisterForSessionChanged(Handler h);
+    //MTK-END multiple application support
+
+    /**
+     * Query network lock status according to indicated category.
+     *
+     * @param categrory network lock category
+     *                  0 for Network personalisation category
+     *                  1 for Network subset personalisation category
+     *                  2 for Service provider personalisation category
+     *                  3 for Corporate(GID) personalisation category
+     *                  4 for SIM/USIM(IMSI) personalisation category
+     * @param response Callback message containing response structure.
+     */
+    void queryNetworkLock(int categrory, Message response);
+
+    /**
+     * Query network lock status according to indicated category.
+     *
+     * @param categrory network lock category
+     *                  "0" for Network personalisation category
+     *                  "1" for Network subset personalisation category
+     *                  "2" for Service provider personalisation category
+     *                  "3" for Corporate(GID) personalisation category
+     *                  "4" for SIM/USIM(IMSI) personalisation category
+     * @param lockop lock operation
+     *               "0" for unlock opreation
+     *               "1" for lock opreation
+     *               "2" for add lock opreation
+     *               "3" for remove lock opreation
+     *               "4" for disable lock category opreation
+     * @param password password of indicated network lock
+     * @param data_imsi IMSI value used to setup lock
+     * @param gid1 GID1 value used to setup lock
+     * @param gid2 GID2 value used to setup lock
+     * @param response Callback message containing response structure.
+     */
+    void setNetworkLock(int catagory, int lockop, String password,
+            String data_imsi, String gid1, String gid2, Message response);
+
+
+    /**
+     * Request security context authentication for SIM/USIM/ISIM
+     */
+    public void doGeneralSimAuthentication(int sessionId, int mode , int tag, String param1,
+                                                    String param2, Message response);
+
+    void iccGetATR(Message result);
+    void iccOpenChannelWithSw(String AID, Message result);
+
+    void registerForSimMissing(Handler h, int what, Object obj);
+    void unregisterForSimMissing(Handler h);
+
+    void registerForSimRecovery(Handler h, int what, Object obj);
+    void unregisterForSimRecovery(Handler h);
+
+    public void registerForVirtualSimOn(Handler h, int what, Object obj);
+    public void unregisterForVirtualSimOn(Handler h);
+
+    public void registerForVirtualSimOff(Handler h, int what, Object obj);
+    public void unregisterForVirtualSimOff(Handler h);
+
+    /**
+     * Sets the handler for event notifications for SIM plug-out event.
+     *
+     * @param h Handler for notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void registerForSimPlugOut(Handler h, int what, Object obj);
+
+    /**
+     * Unregister the handler for event notifications for SIM plug-out event.
+     *
+     * @param h Handler for notification message.
+     */
+    void unregisterForSimPlugOut(Handler h);
+
+    /**
+     * Sets the handler for event notifications for SIM plug-in event.
+     *
+     * @param h Handler for notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    void registerForSimPlugIn(Handler h, int what, Object obj);
+
+    /**
+     * Unregister the handler for event notifications for SIM plug-in event.
+     *
+     * @param h Handler for notification message.
+     */
+    void unregisterForSimPlugIn(Handler h);
+
+    /**
+     * Sets the handler for event notifications for SIM common slot no changed.
+     *
+     */
+    void registerForCommonSlotNoChanged(Handler h, int what, Object obj);
+
+    /**
+     * Unregister the handler for event notifications for SIM common slot no changed.
+     *
+     */
+    void unregisterForCommonSlotNoChanged(Handler h);
+
+    void registerForPsNetworkStateChanged(Handler h, int what, Object obj);
+    void unregisterForPsNetworkStateChanged(Handler h);
+
+    /**
+     * unlike the register* methods, there's only one Neighboring cell info handler
+     *
+     * AsyncResult.result is an Object[]
+     * ((Object[])AsyncResult.result)[0] is a String containing the RAT
+     * ((Object[])AsyncResult.result)[1] is a String containing the neighboring cell info raw data
+     *
+     * Please note that the delivery of this message may be delayed several
+     * seconds on system startup
+     */
+    void registerForNeighboringInfo(Handler h, int what, Object obj);
+    void unregisterForNeighboringInfo(Handler h);
+
+    /**
+     * unlike the register* methods, there's only one Network info handler
+     *
+     * AsyncResult.result is an Object[]
+     * ((Object[])AsyncResult.result)[0] is a String containing the type
+     * ((Object[])AsyncResult.result)[1] is a String contain the network info raw data
+     *
+     * Please note that the delivery of this message may be delayed several
+     * seconds on system startup
+     */
+    void registerForNetworkInfo(Handler h, int what, Object obj);
+    void unregisterForNetworkInfo(Handler h);
+
+    void setTrm(int mode, Message result);
+
+    void setOnPlmnChangeNotification(Handler h, int what, Object obj);
+    void unSetOnPlmnChangeNotification(Handler h);
+    void setOnRegistrationSuspended(Handler h, int what, Object obj);
+    void unSetOnRegistrationSuspended(Handler h);
+    void setResumeRegistration(int sessionId, Message response);
+    void storeModemType(int modemType, Message response);
+    void queryModemType(Message response);
+
+    /**
+     *  Set phone RAT family.
+     *
+     *  @param ratFamily bit mask to identify PhoneRatFamily.PHONE_RAT_FAMILY_2G,
+     *         PhoneRatFamily.PHONE_RAT_FAMILY_3G, PhoneRatFamily.PHONE_RAT_FAMILY_4G
+     *  @param result Callback message.
+     */
+    public void setPhoneRatFamily(int ratFamily, Message result);
+
+    /**
+     *  Get phone RAT family.
+     *
+     *  @param result Callback message.
+     */
+    public void getPhoneRatFamily(Message result);
+
+    /**
+     * Registers the handler when phone RAT family is changed.
+     *
+     * @param h Handler for notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    public void registerForPhoneRatFamilyChanged(Handler h, int what, Object obj);
+
+    /**
+     * Unregister for notifications when phone RAT family is changed.
+     *
+     * @param h Handler to be removed from the registrant list.
+     */
+    public void unregisterForPhoneRatFamilyChanged(Handler h);
+
+    public void setInitialAttachApn(String apn, String protocol, int authType, String username,
+            String password, String operatorNumeric, boolean canHandleIms, Message result);
+
+    // Fast Dormancy
+    void setScri(boolean forceRelease, Message response);
+    void setFDMode(int mode, int parameter1, int parameter2, Message response);
+    public void setScriResult(Handler h, int what, Object obj);
+    public void unSetScriResult(Handler h);
+
+    // DS: MTK
+    public int getSupportedRadioAccessFamily();
+    public void getRadioCapability(Message result);
+    public void setRadioCapability(RadioCapability caps, Message result);
+    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o);
+    public void unregisterForRadioCapabilityChanged(Handler handler);
+
 }

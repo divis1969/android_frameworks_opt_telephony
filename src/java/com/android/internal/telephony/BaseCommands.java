@@ -97,6 +97,29 @@ public abstract class BaseCommands implements CommandsInterface {
     protected Registrant mCatCcAlphaRegistrant;
     protected Registrant mSsRegistrant;
 
+    // MTK registrants
+    protected RegistrantList mPhoneRatFamilyChangedRegistrants = new RegistrantList();
+    protected RegistrantList mSessionChangedRegistrants = new RegistrantList();
+    protected RegistrantList mSimMissing = new RegistrantList();
+    protected RegistrantList mSimRecovery = new RegistrantList();
+    protected RegistrantList mVirtualSimOn = new RegistrantList();
+    protected RegistrantList mVirtualSimOff = new RegistrantList();
+    protected RegistrantList mSimPlugOutRegistrants = new RegistrantList();
+    protected RegistrantList mSimPlugInRegistrants = new RegistrantList();
+    protected RegistrantList mCommonSlotNoChangedRegistrants = new RegistrantList();
+    protected RegistrantList mDataAllowedRegistrants = new RegistrantList();
+    protected RegistrantList mNeighboringInfoRegistrants = new RegistrantList();
+    protected RegistrantList mNetworkInfoRegistrants = new RegistrantList();
+    protected RegistrantList mPlmnChangeNotificationRegistrant = new RegistrantList();
+    protected RegistrantList mPsNetworkStateRegistrants = new RegistrantList();
+    protected Registrant mRegistrationSuspendedRegistrant;
+    // M: fast dormancy.
+    protected Registrant mScriResultRegistrant;
+
+    // DS: MTK
+    protected RegistrantList mPhoneRadioCapabilityChangedRegistrants = new RegistrantList();
+    protected int mSupportedRaf = 1;
+
     // Preferred network type received from PhoneFactory.
     // This is used when establishing a connection to the
     // vendor ril so it starts up in the correct mode.
@@ -107,6 +130,12 @@ public abstract class BaseCommands implements CommandsInterface {
     protected int mPhoneType;
     // RIL Version
     protected int mRilVersion = -1;
+
+    // MTK states
+    /* M: call control part start */
+    protected boolean mbWaitingForECFURegistrants = false;
+    protected Object mCfuReturnValue = null; ///* M: SS part */
+    /* M: call control part end */
 
     public BaseCommands(Context context) {
         mContext = context;  // May be null (if so we won't log statistics)
@@ -936,4 +965,212 @@ public abstract class BaseCommands implements CommandsInterface {
         return TelephonyManager.getLteOnGsmModeStatic();
     }
 
+    // MTK additions
+
+    //MTK-START Support Multi-Application
+    @Override
+    public void openIccApplication(int application, Message response) {
+    }
+
+    @Override
+    public void getIccApplicationStatus(int sessionId, Message result) {
+    }
+
+    @Override
+    public void iccIOForAppEx(int command, int fileid, String path, int p1, int p2, int p3,
+            String data, String pin2, String aid, int channel, Message response) {
+    }
+
+    @Override
+    public void registerForSessionChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mSessionChangedRegistrants.add(r);
+    }
+
+    @Override
+    public void unregisterForSessionChanged(Handler h) {
+        mSessionChangedRegistrants.remove(h);
+    }
+    //MTK-END Support Multi-Application
+
+    //MTK-START Support SIM ME lock
+    @Override
+    public void queryNetworkLock(int categrory, Message response){};
+
+    @Override
+    public void setNetworkLock(int catagory, int lockop, String password,
+            String data_imsi, String gid1, String gid2, Message response){};
+    //MTK-END Support SIM ME lock
+
+    @Override
+    public void doGeneralSimAuthentication(int sessionId, int mode , int tag, String param1,
+                                          String param2, Message response) {
+    }
+
+    public void registerForSimMissing(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mSimMissing.add(r);
+    }
+    public void unregisterForSimMissing(Handler h) {
+        mSimMissing.remove(h);
+    }
+
+    public void registerForSimRecovery(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mSimRecovery.add(r);
+    }
+
+    public void unregisterForSimRecovery(Handler h) {
+        mSimRecovery.remove(h);
+    }
+
+    public void registerForVirtualSimOn(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mVirtualSimOn.add(r);
+    }
+
+    public void unregisterForVirtualSimOn(Handler h) {
+        mVirtualSimOn.remove(h);
+    }
+
+    public void registerForVirtualSimOff(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mVirtualSimOff.add(r);
+    }
+
+    public void unregisterForVirtualSimOff(Handler h) {
+        mVirtualSimOff.remove(h);
+    }
+
+    public void registerForSimPlugOut(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mSimPlugOutRegistrants.add(r);
+    }
+
+    public void unregisterForSimPlugOut(Handler h) {
+        mSimPlugOutRegistrants.remove(h);
+    }
+
+    public void registerForSimPlugIn(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mSimPlugInRegistrants.add(r);
+    }
+
+    public void unregisterForSimPlugIn(Handler h) {
+        mSimPlugInRegistrants.remove(h);
+    }
+
+    public void registerForCommonSlotNoChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mCommonSlotNoChangedRegistrants.add(r);
+    }
+
+    public void unregisterForCommonSlotNoChanged(Handler h) {
+        mCommonSlotNoChangedRegistrants.remove(h);
+    }
+
+    public void registerForPsNetworkStateChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+
+        mPsNetworkStateRegistrants.add(r);
+    }
+
+    public void unregisterForPsNetworkStateChanged(Handler h) {
+        mPsNetworkStateRegistrants.remove(h);
+    }
+
+    public void registerForNeighboringInfo(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mNeighboringInfoRegistrants.add(r);
+    }
+
+    public void unregisterForNeighboringInfo(Handler h) {
+        mNeighboringInfoRegistrants.remove(h);
+    }
+
+    public void registerForNetworkInfo(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mNetworkInfoRegistrants.add(r);
+    }
+
+    public void unregisterForNetworkInfo(Handler h) {
+        mNetworkInfoRegistrants.remove(h);
+    }
+
+    public void setTrm(int mode, Message result) {}
+
+    public void setOnPlmnChangeNotification(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mPlmnChangeNotificationRegistrant.add(r);
+    }
+
+    public void unSetOnPlmnChangeNotification(Handler h) {
+        mPlmnChangeNotificationRegistrant.remove(h);
+    }
+
+    public void setOnRegistrationSuspended(Handler h, int what, Object obj) {
+        mRegistrationSuspendedRegistrant = new Registrant(h, what, obj);
+    }
+
+    public void unSetOnRegistrationSuspended(Handler h) {
+        mRegistrationSuspendedRegistrant.clear();
+    }
+
+    @Override
+    public void setPhoneRatFamily(int ratFamily, Message response) {
+    }
+
+    @Override
+    public void getPhoneRatFamily(Message response) {
+    }
+
+    @Override
+    public void registerForPhoneRatFamilyChanged(Handler h, int what, Object obj) {
+        Registrant r = new Registrant(h, what, obj);
+        mPhoneRatFamilyChangedRegistrants.add(r);
+    }
+
+    @Override
+    public void unregisterForPhoneRatFamilyChanged(Handler h) {
+        mPhoneRatFamilyChangedRegistrants.remove(h);
+    }
+
+    // M: fast dormancy
+    public void setScriResult(Handler h, int what, Object obj) {
+        mScriResultRegistrant = new Registrant(h, what, obj);
+    }
+
+    public void unSetScriResult(Handler h) {
+        mScriResultRegistrant.clear();
+    }
+
+    public void setScri(boolean forceRelease, Message response){
+    }
+
+    public void setFDMode(int mode, int parameter1, int parameter2, Message response){
+    }
+
+    // DS: MTK
+    @Override
+    public int getSupportedRadioAccessFamily() {
+        return mSupportedRaf;
+    }
+
+    @Override
+    public void getRadioCapability(Message result) {
+    }
+
+    @Override
+    public void setRadioCapability(RadioCapability caps, Message result) {
+    }
+
+    @Override
+    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o) {
+        mPhoneRadioCapabilityChangedRegistrants.add(new Registrant(handler, n, o));
+    }
+
+    @Override
+    public void unregisterForRadioCapabilityChanged(Handler handler) {
+        this.mPhoneRadioCapabilityChangedRegistrants.remove(handler);
+    }
 }

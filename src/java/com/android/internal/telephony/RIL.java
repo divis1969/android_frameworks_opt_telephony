@@ -55,6 +55,7 @@ import android.telephony.SignalStrength;
 import android.telephony.SmsManager;
 import android.telephony.SmsMessage;
 import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.SparseArray;
 import android.view.Display;
@@ -288,6 +289,13 @@ public class RIL extends BaseCommands implements CommandsInterface {
     // 4 elements is default, but many RILs actually return 5, making it impossible to
     // divide the response array without prior knowledge of the number of elements.
     protected int mQANElements = 4;
+
+    // MTK
+    // save the status of screen
+    private boolean isScreenOn = true;
+
+    // DS: MTK
+    private Handler mSupportedRafHandler;
 
     //***** Events
 
@@ -658,6 +666,20 @@ public class RIL extends BaseCommands implements CommandsInterface {
         mPreferredNetworkType = preferredNetworkType;
         mPhoneType = RILConstants.NO_PHONE;
         mInstanceId = instanceId;
+
+        mSupportedRafHandler = new Handler() {
+            public void handleMessage(Message message) {
+                AsyncResult asyncResult = (AsyncResult)message.obj;
+                RadioCapability radioCapability = (RadioCapability)asyncResult.result;
+                if (asyncResult.exception != null) {
+                    riljLog("Get supported radio access family fail");
+                }
+                else {
+                    mSupportedRaf = radioCapability.getRadioAccessFamily();
+                    riljLog("Supported radio access family=" + mSupportedRaf);
+                }
+            }
+        };
 
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, RILJ_LOG_TAG);
@@ -2483,6 +2505,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
     }
 
     protected void sendScreenState(boolean on) {
+        // MTK
+        isScreenOn = on;
+
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_SCREEN_STATE, null);
         rr.mParcel.writeInt(1);
         rr.mParcel.writeInt(on ? 1 : 0);
@@ -2817,6 +2842,10 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_GET_HARDWARE_CONFIG: ret = responseHardwareConfig(p); break;
             case RIL_REQUEST_SIM_AUTHENTICATION: ret =  responseICC_IOBase64(p); break;
             case RIL_REQUEST_SHUTDOWN: ret = responseVoid(p); break;
+            // DS: MTK
+            case RIL_REQUEST_GET_RADIO_CAPABILITY: ret = responseRadioCapability(p); break;
+            case RIL_REQUEST_SET_RADIO_CAPABILITY: ret = responseRadioCapability(p); break;
+            case RIL_REQUEST_RESUME_REGISTRATION: ret =  responseVoid(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             //break;
@@ -3021,6 +3050,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_ON_SS: ret =  responseSsData(p); break;
             case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: ret =  responseString(p); break;
             case RIL_UNSOL_STK_SEND_SMS_RESULT: ret = responseInts(p); break; // Samsung STK
+
+            // DS: MTK:
+            case RIL_UNSOL_RADIO_CAPABILITY: ret = responseRadioCapability(p); break;
 
             default:
                 throw new RuntimeException("Unrecognized unsol response: " + response);
@@ -3387,12 +3419,20 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_RIL_CONNECTED: {
                 if (RILJ_LOGD) unsljLogRet(response, ret);
 
+                getRadioCapability(mSupportedRafHandler.obtainMessage());
+                // Set ecc list before MO call
+                if  (TelephonyManager.getDefault().getMultiSimConfiguration() == TelephonyManager.MultiSimVariants.DSDA
+                        || mInstanceId == 0) {
+                    setEccList();
+                }
+
                 // Initial conditions
-                setRadioPower(false, null);
+                // setRadioPower(false, null);
                 setPreferredNetworkType(mPreferredNetworkType, null);
                 setCdmaSubscriptionSource(mCdmaSubscription, null);
                 setCellInfoListRate(Integer.MAX_VALUE, null);
                 notifyRegistrantsRilConnectionChanged(((int[])ret)[0]);
+                sendScreenState(isScreenOn);
                 break;
             }
             case RIL_UNSOL_CELL_INFO_LIST: {
@@ -3458,6 +3498,13 @@ public class RIL extends BaseCommands implements CommandsInterface {
                     }
                 }
                 break;
+
+            case RIL_UNSOL_RADIO_CAPABILITY: {
+                this.unsljLogRet(response, ret);
+                if (mPhoneRadioCapabilityChangedRegistrants != null) {
+                    mPhoneRadioCapabilityChangedRegistrants.notifyRegistrants(new AsyncResult((Object)null, ret, (Throwable)null));
+                }
+            }
         }
     }
 
@@ -3900,6 +3947,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 	      dataCall.suggestedRetryTime = p.readInt();
             dataCall.cid = p.readInt();
             dataCall.active = p.readInt();
+            dataCall.mtu = p.readInt(); // DS: MTK
             dataCall.type = p.readString();
             dataCall.ifname = p.readString();
             if ((dataCall.status == DcFailCause.NONE.getErrorCode()) &&
@@ -4378,6 +4426,10 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_SETUP_DATA_CALL: return "SETUP_DATA_CALL";
             case RIL_REQUEST_SIM_IO: return "SIM_IO";
             case RIL_REQUEST_SEND_USSD: return "SEND_USSD";
+            /* M: SS part */
+            ///M: For query CNAP
+            case RIL_REQUEST_SEND_CNAP: return "SEND_CNAP";
+            /* M: SS part end */
             case RIL_REQUEST_CANCEL_USSD: return "CANCEL_USSD";
             case RIL_REQUEST_GET_CLIR: return "GET_CLIR";
             case RIL_REQUEST_SET_CLIR: return "SET_CLIR";
@@ -4397,6 +4449,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC: return "SET_NETWORK_SELECTION_AUTOMATIC";
             case RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL: return "SET_NETWORK_SELECTION_MANUAL";
             case RIL_REQUEST_QUERY_AVAILABLE_NETWORKS : return "QUERY_AVAILABLE_NETWORKS ";
+            case RIL_REQUEST_ABORT_QUERY_AVAILABLE_NETWORKS : return "ABORT_QUERY_AVAILABLE_NETWORKS";
             case RIL_REQUEST_DTMF_START: return "DTMF_START";
             case RIL_REQUEST_DTMF_STOP: return "DTMF_STOP";
             case RIL_REQUEST_BASEBAND_VERSION: return "BASEBAND_VERSION";
@@ -4477,7 +4530,140 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_REQUEST_GET_HARDWARE_CONFIG: return "GET_HARDWARE_CONFIG";
             case RIL_REQUEST_SIM_AUTHENTICATION: return "RIL_REQUEST_SIM_AUTHENTICATION";
             case RIL_REQUEST_SHUTDOWN: return "RIL_REQUEST_SHUTDOWN";
-            default: return "<unknown request>";
+            // DS: case RIL_REQUEST_SET_PHONE_RAT_FAMILY: return "RIL_REQUEST_SET_PHONE_RAT_FAMILY";
+            // DS: case RIL_REQUEST_GET_PHONE_RAT_FAMILY: return "RIL_REQUEST_GET_PHONE_RAT_FAMILY";
+
+            /* M: call control part start */
+            case RIL_REQUEST_HANGUP_ALL: return "HANGUP_ALL";
+            case RIL_REQUEST_FORCE_RELEASE_CALL: return "FORCE_RELEASE_CALL";
+            case RIL_REQUEST_SET_CALL_INDICATION: return "SET_CALL_INDICATION";
+            case RIL_REQUEST_EMERGENCY_DIAL: return "EMERGENCY_DIAL";
+            case RIL_REQUEST_SET_ECC_SERVICE_CATEGORY: return "SET_ECC_SERVICE_CATEGORY";
+            case RIL_REQUEST_SET_ECC_LIST: return "SET_ECC_LIST";
+            case RIL_REQUEST_SET_SPEECH_CODEC_INFO: return "SET_SPEECH_CODEC_INFO";
+            /* M: call control part end */
+
+            /// M: IMS feature. @{
+            case RIL_REQUEST_ADD_IMS_CONFERENCE_CALL_MEMBER: return "RIL_REQUEST_ADD_IMS_CONFERENCE_CALL_MEMBER";
+            case RIL_REQUEST_REMOVE_IMS_CONFERENCE_CALL_MEMBER: return "RIL_REQUEST_REMOVE_IMS_CONFERENCE_CALL_MEMBER";
+            case RIL_REQUEST_DIAL_WITH_SIP_URI: return "RIL_REQUEST_DIAL_WITH_SIP_URI";
+            case RIL_REQUEST_RETRIEVE_HELD_CALL: return "RIL_REQUEST_RETRIEVE_HELD_CALL";
+            /// @}
+
+            //MTK-START SIM ME lock
+            case RIL_REQUEST_QUERY_SIM_NETWORK_LOCK: return "QUERY_SIM_NETWORK_LOCK";
+            case RIL_REQUEST_SET_SIM_NETWORK_LOCK: return "SET_SIM_NETWORK_LOCK";
+            //MTK-END SIM ME lock
+            //ISIM
+            case RIL_REQUEST_GENERAL_SIM_AUTH: return "RIL_REQUEST_GENERAL_SIM_AUTH";
+            case RIL_REQUEST_OPEN_ICC_APPLICATION: return "RIL_REQUEST_OPEN_ICC_APPLICATION";
+            case RIL_REQUEST_GET_ICC_APPLICATION_STATUS: return "RIL_REQUEST_GET_ICC_APPLICATION_STATUS";
+            case RIL_REQUEST_SIM_IO_EX: return "SIM_IO_EX";
+
+            // PHB Start
+            case RIL_REQUEST_QUERY_PHB_STORAGE_INFO: return "RIL_REQUEST_QUERY_PHB_STORAGE_INFO";
+            case RIL_REQUEST_WRITE_PHB_ENTRY: return "RIL_REQUEST_WRITE_PHB_ENTRY";
+            case RIL_REQUEST_READ_PHB_ENTRY: return "RIL_REQUEST_READ_PHB_ENTRY";
+            case RIL_REQUEST_QUERY_UPB_CAPABILITY: return "RIL_REQUEST_QUERY_UPB_CAPABILITY";
+            case RIL_REQUEST_EDIT_UPB_ENTRY: return "RIL_REQUEST_EDIT_UPB_ENTRY";
+            case RIL_REQUEST_DELETE_UPB_ENTRY: return "RIL_REQUEST_DELETE_UPB_ENTRY";
+            case RIL_REQUEST_READ_UPB_GAS_LIST: return "RIL_REQUEST_READ_UPB_GAS_LIST";
+            case RIL_REQUEST_READ_UPB_GRP: return "RIL_REQUEST_READ_UPB_GRP";
+            case RIL_REQUEST_WRITE_UPB_GRP: return "RIL_REQUEST_WRITE_UPB_GRP";
+            case RIL_REQUEST_GET_PHB_STRING_LENGTH: return "RIL_REQUEST_GET_PHB_STRING_LENGTH";
+            case RIL_REQUEST_GET_PHB_MEM_STORAGE: return "RIL_REQUEST_GET_PHB_MEM_STORAGE";
+            case RIL_REQUEST_SET_PHB_MEM_STORAGE: return "RIL_REQUEST_SET_PHB_MEM_STORAGE";
+            case RIL_REQUEST_READ_PHB_ENTRY_EXT: return "RIL_REQUEST_READ_PHB_ENTRY_EXT";
+            case RIL_REQUEST_WRITE_PHB_ENTRY_EXT: return "RIL_REQUEST_WRITE_PHB_ENTRY_EXT";
+            // PHB End
+
+            /* M: network part start */
+            case RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL_WITH_ACT: return "SET_NETWORK_SELECTION_MANUAL_WITH_ACT";
+            case RIL_REQUEST_GET_POL_CAPABILITY: return "RIL_REQUEST_GET_POL_CAPABILITY";
+            case RIL_REQUEST_GET_POL_LIST: return "RIL_REQUEST_GET_POL_LIST";
+            case RIL_REQUEST_SET_POL_ENTRY: return "RIL_REQUEST_SET_POL_ENTRY";
+            case RIL_REQUEST_SET_TRM: return "RIL_REQUEST_SET_TRM";
+            case RIL_REQUEST_QUERY_AVAILABLE_NETWORKS_WITH_ACT : return "QUERY_AVAILABLE_NETWORKS_WITH_ACT";
+            //Femtocell (CSG) feature START
+            case RIL_REQUEST_GET_FEMTOCELL_LIST: return "RIL_REQUEST_GET_FEMTOCELL_LIST";
+            case RIL_REQUEST_ABORT_FEMTOCELL_LIST: return "RIL_REQUEST_ABORT_FEMTOCELL_LIST";
+            case RIL_REQUEST_SELECT_FEMTOCELL: return "RIL_REQUEST_SELECT_FEMTOCELL";
+            //Femtocell (CSG) feature END
+            /* M: network part end */
+            case RIL_REQUEST_STK_EVDL_CALL_BY_AP: return "RIL_REQUEST_STK_EVDL_CALL_BY_AP";
+            case RIL_REQUEST_QUERY_MODEM_TYPE: return "RIL_REQUEST_QUERY_MODEM_TYPE";
+            case RIL_REQUEST_STORE_MODEM_TYPE: return "RIL_REQUEST_STORE_MODEM_TYPE";
+            case RIL_REQUEST_SIM_GET_ATR: return "SIM_GET_ATR";
+            case RIL_REQUEST_SIM_OPEN_CHANNEL_WITH_SW: return "SIM_OPEN_CHANNEL_WITH_SW";
+            //VoLTE
+            case RIL_REQUEST_SETUP_DEDICATE_DATA_CALL: return "RIL_REQUEST_SETUP_DEDICATE_DATA_CALL";
+            case RIL_REQUEST_DEACTIVATE_DEDICATE_DATA_CALL: return "RIL_REQUEST_DEACTIVATE_DEDICATE_DATA_CALL";
+            case RIL_REQUEST_MODIFY_DATA_CALL: return "RIL_REQUEST_MODIFY_DATA_CALL";
+            case RIL_REQUEST_ABORT_SETUP_DATA_CALL: return "RIL_REQUEST_ABORT_SETUP_DATA_CALL";
+            case RIL_REQUEST_PCSCF_DISCOVERY_PCO: return "RIL_REQUEST_PCSCF_DISCOVERY_PCO";
+            case RIL_REQUEST_CLEAR_DATA_BEARER: return "RIL_REQUEST_CLEAR_DATA_BEARER";
+
+            // IMS
+            case RIL_REQUEST_SET_IMS_ENABLE: return "RIL_REQUEST_SET_IMS_ENABLE";
+
+            // M: Fast Dormancy
+            case RIL_REQUEST_SET_SCRI: return "RIL_REQUEST_SET_SCRI";
+            case RIL_REQUEST_SET_FD_MODE: return "RIL_REQUEST_SET_FD_MODE";
+            // MTK-START, SMS part
+            case RIL_REQUEST_GET_SMS_PARAMS: return "RIL_REQUEST_GET_SMS_PARAMS";
+            case RIL_REQUEST_SET_SMS_PARAMS: return "RIL_REQUEST_SET_SMS_PARAMS";
+            case RIL_REQUEST_GET_SMS_SIM_MEM_STATUS: return "RIL_REQUEST_GET_SMS_SIM_MEM_STATUS";
+            case RIL_REQUEST_SET_ETWS: return "RIL_REQUEST_SET_ETWS";
+            case RIL_REQUEST_SET_CB_CHANNEL_CONFIG_INFO:
+                return "RIL_REQUEST_SET_CB_CHANNEL_CONFIG_INFO";
+            case RIL_REQUEST_SET_CB_LANGUAGE_CONFIG_INFO:
+                return "RIL_REQUEST_SET_CB_LANGUAGE_CONFIG_INFO";
+            case RIL_REQUEST_GET_CB_CONFIG_INFO: return "RIL_REQUEST_GET_CB_CONFIG_INFO";
+            case RIL_REQUEST_REMOVE_CB_MESSAGE: return "RIL_REQUEST_REMOVE_CB_MESSAGE";
+            // MTK-END, SMS part
+            case RIL_REQUEST_SET_DATA_CENTRIC: return "RIL_REQUEST_SET_DATA_CENTRIC";
+
+            case RIL_REQUEST_MODEM_POWEROFF: return "MODEM_POWEROFF";
+            case RIL_REQUEST_MODEM_POWERON: return "MODEM_POWERON";
+            // M: CC33 LTE.
+            case RIL_REQUEST_SET_DATA_ON_TO_MD: return "RIL_REQUEST_SET_DATA_ON_TO_MD";
+            case RIL_REQUEST_SET_REMOVE_RESTRICT_EUTRAN_MODE: return "RIL_REQUEST_SET_REMOVE_RESTRICT_EUTRAN_MODE";
+            case RIL_REQUEST_BTSIM_CONNECT: return "RIL_REQUEST_BTSIM_CONNECT";
+            case RIL_REQUEST_BTSIM_DISCONNECT_OR_POWEROFF: return "RIL_REQUEST_BTSIM_DISCONNECT_OR_POWEROFF";
+            case RIL_REQUEST_BTSIM_POWERON_OR_RESETSIM: return "RIL_REQUEST_BTSIM_POWERON_OR_RESETSIM";
+            case RIL_REQUEST_BTSIM_TRANSFERAPDU: return "RIL_REQUEST_SEND_BTSIM_TRANSFERAPDU";
+
+            /* M: call control part start */
+            case RIL_REQUEST_SET_IMS_CALL_STATUS: return "RIL_REQUEST_SET_IMS_CALL_STATUS";
+            /* M: call control part end */
+
+            /* M: C2K part start */
+            case RIL_REQUEST_GET_NITZ_TIME: return "RIL_REQUEST_GET_NITZ_TIME";
+            case RIL_REQUEST_QUERY_UIM_INSERTED: return "RIL_REQUEST_QUERY_UIM_INSERTED";
+            case RIL_REQUEST_SWITCH_HPF: return "RIL_REQUEST_SWITCH_HPF";
+            case RIL_REQUEST_SET_AVOID_SYS: return "RIL_REQUEST_SET_AVOID_SYS";
+            case RIL_REQUEST_QUERY_AVOID_SYS: return "RIL_REQUEST_QUERY_AVOID_SYS";
+            case RIL_REQUEST_QUERY_CDMA_NETWORK_INFO: return "RIL_REQUEST_QUERY_CDMA_NETWORK_INFO";
+            case RIL_REQUEST_GET_LOCAL_INFO: return "RIL_REQUEST_GET_LOCAL_INFO";
+            case RIL_REQUEST_UTK_REFRESH: return "RIL_REQUEST_UTK_REFRESH";
+            case RIL_REQUEST_QUERY_SMS_AND_PHONEBOOK_STATUS: return "RIL_REQUEST_QUERY_SMS_AND_PHONEBOOK_STATUS";
+            case RIL_REQUEST_QUERY_NETWORK_REGISTRATION: return "RIL_REQUEST_QUERY_NETWORK_REGISTRATION";
+            case RIL_REQUEST_AGPS_TCP_CONNIND: return "RIL_REQUEST_AGPS_TCP_CONNIND";
+            case RIL_REQUEST_AGPS_SET_MPC_IPPORT: return "RIL_REQUEST_AGPS_SET_MPC_IPPORT";
+            case RIL_REQUEST_AGPS_GET_MPC_IPPORT: return "RIL_REQUEST_AGPS_GET_MPC_IPPORT";
+            case RIL_REQUEST_SET_MEID: return "RIL_REQUEST_SET_MEID";
+            case RIL_REQUEST_SET_REG_RESUME: return "RIL_REQUEST_SET_REG_RESUME";
+            case RIL_REQUEST_ENABLE_REG_PAUSE: return "RIL_REQUEST_ENABLE_REG_PAUSE";
+            case RIL_REQUEST_SET_ETS_DEV: return "RIL_REQUEST_SET_ETS_DEV";
+            case RIL_REQUEST_WRITE_MDN: return "RIL_REQUEST_WRITE_MDN";
+            case RIL_REQUEST_SET_VIA_TRM: return "RIL_REQUEST_SET_VIA_TRM";
+            case RIL_REQUEST_SET_ARSI_THRESHOLD: return "RIL_REQUEST_SET_ARSI_THRESHOLD";
+            /* M: C2K part end */
+            // DS: MTK
+            case RIL_REQUEST_GET_RADIO_CAPABILITY: return "RIL_REQUEST_GET_RADIO_CAPABILITY";
+            case RIL_REQUEST_SET_RADIO_CAPABILITY: return "RIL_REQUEST_SET_RADIO_CAPABILITY";
+            case RIL_REQUEST_RESUME_REGISTRATION: return "RIL_REQUEST_RESUME_REGISTRATION";
+            default: return "<unknown request> (" + request + ")";
         }
     }
 
@@ -4534,9 +4720,85 @@ public class RIL extends BaseCommands implements CommandsInterface {
             case RIL_UNSOL_SRVCC_STATE_NOTIFY:
                     return "UNSOL_SRVCC_STATE_NOTIFY";
             case RIL_UNSOL_HARDWARE_CONFIG_CHANGED: return "RIL_UNSOL_HARDWARE_CONFIG_CHANGED";
-            case RIL_UNSOL_ON_SS: return "UNSOL_ON_SS";
-            case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: return "UNSOL_STK_CC_ALPHA_NOTIFY";
-            case RIL_UNSOL_STK_SEND_SMS_RESULT: return "RIL_UNSOL_STK_SEND_SMS_RESULT";
+            case RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE: return "RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE";
+            /* M: call control part start */
+            case RIL_UNSOL_CALL_FORWARDING: return "UNSOL_CALL_FORWARDING";
+            case RIL_UNSOL_CRSS_NOTIFICATION: return "UNSOL_CRSS_NOTIFICATION";
+            case RIL_UNSOL_INCOMING_CALL_INDICATION: return "UNSOL_INCOMING_CALL_INDICATION";
+            case RIL_UNSOL_CIPHER_INDICATION: return "UNSOL_CIPHER_INDICATION";
+            case RIL_UNSOL_CNAP: return "UNSOL_CNAP";
+            case RIL_UNSOL_SPEECH_CODEC_INFO: return "UNSOL_SPEECH_CODEC_INFO";
+            /* M: call control part end */
+            //MTK-START multiple application support
+            case RIL_UNSOL_APPLICATION_SESSION_ID_CHANGED: return "RIL_UNSOL_APPLICATION_SESSION_ID_CHANGED";
+            //MTK-END multiple application support
+            case RIL_UNSOL_SIM_MISSING: return "UNSOL_SIM_MISSING";
+            case RIL_UNSOL_VIRTUAL_SIM_ON: return "UNSOL_VIRTUAL_SIM_ON";
+            case RIL_UNSOL_VIRTUAL_SIM_OFF: return "UNSOL_VIRTUAL_SIM_ON_OFF";
+            case RIL_UNSOL_SIM_RECOVERY: return "UNSOL_SIM_RECOVERY";
+            case RIL_UNSOL_SIM_PLUG_OUT: return "UNSOL_SIM_PLUG_OUT";
+            case RIL_UNSOL_SIM_PLUG_IN: return "UNSOL_SIM_PLUG_IN";
+            case RIL_UNSOL_SIM_COMMON_SLOT_NO_CHANGED: return "RIL_UNSOL_SIM_COMMON_SLOT_NO_CHANGED";
+            case RIL_UNSOL_DATA_ALLOWED: return "RIL_UNSOL_DATA_ALLOWED";
+            case RIL_UNSOL_PHB_READY_NOTIFICATION: return "UNSOL_PHB_READY_NOTIFICATION";
+            case RIL_UNSOL_IMEI_LOCK: return "UNSOL_IMEI_LOCK";
+            case RIL_UNSOL_RESPONSE_ACMT: return "UNSOL_ACMT_INFO";
+            case RIL_UNSOL_RESPONSE_PS_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_PS_NETWORK_STATE_CHANGED";
+            case RIL_UNSOL_RESPONSE_MMRR_STATUS_CHANGED: return "UNSOL_RESPONSE_MMRR_STATUS_CHANGED";
+            case RIL_UNSOL_NEIGHBORING_CELL_INFO: return "UNSOL_NEIGHBORING_CELL_INFO";
+            case RIL_UNSOL_NETWORK_INFO: return "UNSOL_NETWORK_INFO";
+            case RIL_UNSOL_INVALID_SIM: return "RIL_UNSOL_INVALID_SIM";
+            case RIL_UNSOL_IMS_ENABLE_DONE: return "RIL_UNSOL_IMS_ENABLE_DONE";
+            case RIL_UNSOL_IMS_DISABLE_DONE: return "RIL_UNSOL_IMS_DISABLE_DONE";
+            case RIL_UNSOL_IMS_REGISTRATION_INFO: return "RIL_UNSOL_IMS_REGISTRATION_INFO";
+            case RIL_UNSOL_STK_SETUP_MENU_RESET: return "RIL_UNSOL_STK_SETUP_MENU_RESET";
+            case RIL_UNSOL_RESPONSE_PLMN_CHANGED: return "RIL_UNSOL_RESPONSE_PLMN_CHANGED";
+            case RIL_UNSOL_RESPONSE_REGISTRATION_SUSPENDED: return "RIL_UNSOL_RESPONSE_REGISTRATION_SUSPENDED";
+            //VoLTE
+            case RIL_UNSOL_DEDICATE_BEARER_ACTIVATED: return "RIL_UNSOL_DEDICATE_BEARER_ACTIVATED";
+            case RIL_UNSOL_DEDICATE_BEARER_MODIFIED: return "RIL_UNSOL_DEDICATE_BEARER_MODIFIED";
+            //Remote SIM ME lock related APIs [Start]
+            case RIL_UNSOL_MELOCK_NOTIFICATION: return "RIL_UNSOL_MELOCK_NOTIFICATION";
+            //Remote SIM ME lock related APIs [End]
+            // M: Fast Dormancy
+            case RIL_UNSOL_SCRI_RESULT: return "RIL_UNSOL_SCRI_RESULT";
+            case RIL_UNSOL_STK_EVDL_CALL: return "RIL_UNSOL_STK_EVDL_CALL";
+            case RIL_UNSOL_STK_CALL_CTRL: return "RIL_UNSOL_STK_CALL_CTRL";
+
+            /// M: IMS feature. @{
+            case RIL_UNSOL_ECONF_SRVCC_INDICATION: return "RIL_UNSOL_ECONF_SRVCC_INDICATION";
+            //For updating conference call merged/added result.
+            case RIL_UNSOL_ECONF_RESULT_INDICATION: return "RIL_UNSOL_ECONF_RESULT_INDICATION";
+            //For updating call mode and pau information.
+            case RIL_UNSOL_CALL_INFO_INDICATION : return "RIL_UNSOL_CALL_INFO_INDICATION";
+            /// @}
+
+            case RIL_UNSOL_VOLTE_EPS_NETWORK_FEATURE_INFO: return "RIL_UNSOL_VOLTE_EPS_NETWORK_FEATURE_INFO";
+            case RIL_UNSOL_SRVCC_HANDOVER_INFO_INDICATION: return "RIL_UNSOL_SRVCC_HANDOVER_INFO_INDICATION";
+            // M: CC33 LTE.
+            case RIL_UNSOL_RAC_UPDATE: return "RIL_UNSOL_RAC_UPDATE";
+            case RIL_UNSOL_REMOVE_RESTRICT_EUTRAN: return "RIL_UNSOL_REMOVE_RESTRICT_EUTRAN";
+
+            //MTK-START for MD state change
+            case RIL_UNSOL_MD_STATE_CHANGE: return "RIL_UNSOL_MD_STATE_CHANGE";
+            //MTK-END for MD state change
+
+            case RIL_UNSOL_MO_DATA_BARRING_INFO: return "RIL_UNSOL_MO_DATA_BARRING_INFO";
+            case RIL_UNSOL_SSAC_BARRING_INFO: return "RIL_UNSOL_SSAC_BARRING_INFO";
+            //MTK_TC1_FEATURE for LGE CSMCC_MO_CALL_MODIFIED {
+            case RIL_UNSOL_RESPONSE_MO_CALL_STATE_CHANGED: return "UNSOL_RESPONSE_MO_CALL_STATE_CHANGED";
+            //}
+
+            /* M: C2K part start */
+            case RIL_UNSOL_CDMA_CALL_ACCEPTED: return "RIL_UNSOL_CDMA_CALL_ACCEPTED";
+            case RIL_UNSOL_UTK_SESSION_END: return "RIL_UNSOL_UTK_SESSION_END";
+            case RIL_UNSOL_UTK_PROACTIVE_COMMAND: return "RIL_UNSOL_UTK_PROACTIVE_COMMAND";
+            case RIL_UNSOL_UTK_EVENT_NOTIFY: return "RIL_UNSOL_UTK_EVENT_NOTIFY";
+            case RIL_UNSOL_VIA_GPS_EVENT: return "RIL_UNSOL_VIA_GPS_EVENT";
+            case RIL_UNSOL_VIA_NETWORK_TYPE_CHANGE: return "RIL_UNSOL_VIA_NETWORK_TYPE_CHANGE";
+            case RIL_UNSOL_VIA_PLMN_CHANGE_REG_PAUSE: return "RIL_UNSOL_VIA_PLMN_CHANGE_REG_PAUSE";
+            case RIL_UNSOL_VIA_INVALID_SIM_DETECTED: return "RIL_UNSOL_VIA_INVALID_SIM_DETECTED";
+            /* M: C2K part end */
             default: return "<unknown response>";
         }
     }
@@ -4878,6 +5140,13 @@ public class RIL extends BaseCommands implements CommandsInterface {
         send(rr);
     }
 
+    @Override
+    public void setInitialAttachApn(String apn, String protocol, int authType, String username,
+            String password, String operatorNumeric, boolean canHandleIms, Message result) {
+        // On generic RIL implementation we just ignore the MTK-specific parameters
+        setInitialAttachApn(apn, protocol, authType, username, password, result);
+    }
+
     public void setDataProfile(DataProfile[] dps, Message result) {
         if (RILJ_LOGD) riljLog("Set RIL_REQUEST_SET_DATA_PROFILE");
 
@@ -5098,4 +5367,324 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
         send(rr);
     }
+
+    // MTK additions
+    //MTK-START Support Multi-Application
+    @Override
+    public void openIccApplication(int application, Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_OPEN_ICC_APPLICATION, response);
+
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(application);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + ", application = " + application);
+        send(rr);
+    }
+
+    @Override
+    public void getIccApplicationStatus(int sessionId, Message result) {
+        //Note: This RIL request has not been renamed to ICC,
+        //       but this request is also valid for SIM and RUIM
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_ICC_APPLICATION_STATUS, result);
+
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(sessionId);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                + ", session = " + sessionId);
+        send(rr);
+    }
+
+    @Override
+    public void iccIOForAppEx(int command, int fileid, String path, int p1, int p2, int p3,
+            String data, String pin2, String aid, int channel , Message result) {
+        //Note: This RIL request has not been renamed to ICC,
+        //       but this request is also valid for SIM and RUIM
+        RILRequest rr
+                = RILRequest.obtain(RIL_REQUEST_SIM_IO_EX, result);
+
+        rr.mParcel.writeInt(command);
+        rr.mParcel.writeInt(fileid);
+        rr.mParcel.writeString(path);
+        rr.mParcel.writeInt(p1);
+        rr.mParcel.writeInt(p2);
+        rr.mParcel.writeInt(p3);
+        rr.mParcel.writeString(data);
+        rr.mParcel.writeString(pin2);
+        rr.mParcel.writeString(aid);
+        rr.mParcel.writeInt(channel);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> iccIO: "
+                + requestToString(rr.mRequest)
+                + " 0x" + Integer.toHexString(command)
+                + " 0x" + Integer.toHexString(fileid) + " "
+                + " path: " + path + ","
+                + p1 + "," + p2 + "," + p3 + ",channel:" + channel
+                + " aid: " + aid);
+
+        send(rr);
+    }
+    //MTK-END Support Multi-Application
+
+    @Override
+    public void queryNetworkLock(int category, Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_QUERY_SIM_NETWORK_LOCK, response);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        riljLog("queryNetworkLock:" + category);
+
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(category);
+
+        send(rr);
+    }
+
+    @Override
+    public void setNetworkLock(int catagory, int lockop, String password,
+                        String data_imsi, String gid1, String gid2, Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_SIM_NETWORK_LOCK, response);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        riljLog("setNetworkLock:" + catagory + ", " + lockop + ", " + password + ", " + data_imsi
+                + ", " + gid1 + ", " + gid2);
+
+        rr.mParcel.writeInt(6);
+        rr.mParcel.writeString(Integer.toString(catagory));
+        rr.mParcel.writeString(Integer.toString(lockop));
+        if (null != password) {
+            rr.mParcel.writeString(password);
+        } else {
+            rr.mParcel.writeString("");
+        }
+        rr.mParcel.writeString(data_imsi);
+        rr.mParcel.writeString(gid1);
+        rr.mParcel.writeString(gid2);
+
+        send(rr);
+    }
+
+    @Override
+    public void doGeneralSimAuthentication(int sessionId, int mode , int tag, String param1,
+                                         String param2, Message response) {
+
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_GENERAL_SIM_AUTH, response);
+
+        rr.mParcel.writeInt(sessionId);
+        rr.mParcel.writeInt(mode);
+
+        // Calcuate param1 length in byte length
+        if (param1 != null && param1.length() > 0) {
+            String length = Integer.toHexString(param1.length() / 2);
+            length = (((length.length() % 2 == 1) ? "0" : "") + length);
+            // Session id is equal to 0, for backward compability, we use old AT command
+            // old AT command no need to include param's length
+            rr.mParcel.writeString(((sessionId == 0) ? param1 : (length + param1)));
+        } else {
+            rr.mParcel.writeString(param1);
+        }
+
+        // Calcuate param2 length in byte length
+        if (param2 != null && param2.length() > 0) {
+            String length = Integer.toHexString(param2.length() / 2);
+            length = (((length.length() % 2 == 1) ? "0" : "") + length);
+            // Session id is equal to 0, for backward compability, we use old AT command
+            // old AT command no need to include param's length
+            rr.mParcel.writeString(((sessionId == 0) ? param2 : (length + param2)));
+        } else {
+            rr.mParcel.writeString(param2);
+        }
+
+        if (mode == 1) {
+            rr.mParcel.writeInt(tag);
+        }
+
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest) + ": " +
+            "session = " + sessionId + ",mode = " + mode + ",tag = " + tag + ", "  + param1 + ", " + param2);
+
+        send(rr);
+    }
+
+    @Override
+    public void iccGetATR(Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SIM_GET_ATR, result);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    @Override
+    public void iccOpenChannelWithSw(String AID, Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SIM_OPEN_CHANNEL_WITH_SW, result);
+
+        rr.mParcel.writeString(AID);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> iccOpenChannelWithSw: " + requestToString(rr.mRequest)
+                + " " + AID);
+
+        send(rr);
+    }
+
+    public void setTrm(int mode, Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_TRM, null);
+
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(mode);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        send(rr);
+    }
+
+    public void setResumeRegistration(int sessionId, Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_RESUME_REGISTRATION, response);
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(sessionId);
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        send(rr);
+    }
+
+    public void queryModemType(Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_QUERY_MODEM_TYPE, response);
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        send(rr);
+    }
+
+    public void storeModemType(int modemType, Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_STORE_MODEM_TYPE, response);
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(modemType);
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        send(rr);
+    }
+
+    /*
+    public void
+    emergencyDial(String address, int clirMode, UUSInfo uusInfo, Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_EMERGENCY_DIAL, result);
+
+        rr.mParcel.writeString(address);
+        rr.mParcel.writeInt(clirMode);
+        rr.mParcel.writeInt(0); // UUS information is absent
+
+        if (uusInfo == null) {
+            rr.mParcel.writeInt(0); // UUS information is absent
+        } else {
+            rr.mParcel.writeInt(1); // UUS information is present
+            rr.mParcel.writeInt(uusInfo.getType());
+            rr.mParcel.writeInt(uusInfo.getDcs());
+            rr.mParcel.writeByteArray(uusInfo.getUserData());
+        }
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+    */
+
+    public void setEccServiceCategory(int serviceCategory) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_ECC_SERVICE_CATEGORY, null);
+
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(serviceCategory);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+            + " " + serviceCategory);
+
+        send(rr);
+    }
+
+    private void setEccList() {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_ECC_LIST, null);
+        ArrayList<PhoneNumberUtils.EccEntry> eccList = PhoneNumberUtils.getEccList();
+
+        rr.mParcel.writeInt(eccList.size() * 3);
+        for (PhoneNumberUtils.EccEntry entry : eccList) {
+            rr.mParcel.writeString(entry.getEcc());
+            rr.mParcel.writeString(entry.getCategory());
+            String strCondition = entry.getCondition();
+            if (strCondition.equals(PhoneNumberUtils.EccEntry.ECC_FOR_MMI))
+                strCondition = PhoneNumberUtils.EccEntry.ECC_NO_SIM;
+            rr.mParcel.writeString(strCondition);
+        }
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
+    }
+
+    // M: Fast Dormancy
+    public void setScri(boolean forceRelease, Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_SCRI, response);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(forceRelease ? 1 : 0);
+
+        send(rr);
+    }
+
+    //[New R8 modem FD]
+    public void setFDMode(int mode, int parameter1, int parameter2, Message response) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_FD_MODE, response);
+
+        //AT+EFD=<mode>[,<param1>[,<param2>]]
+        //mode=0:disable modem Fast Dormancy; mode=1:enable modem Fast Dormancy
+        //mode=3:inform modem the screen status; parameter1: screen on or off
+        //mode=2:Fast Dormancy inactivity timer; parameter1:timer_id; parameter2:timer_value
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        if (mode == 0 || mode == 1) {
+            rr.mParcel.writeInt(1);
+            rr.mParcel.writeInt(mode);
+        } else if (mode == 3) {
+            rr.mParcel.writeInt(2);
+            rr.mParcel.writeInt(mode);
+            rr.mParcel.writeInt(parameter1);
+        } else if (mode == 2) {
+            rr.mParcel.writeInt(3);
+            rr.mParcel.writeInt(mode);
+            rr.mParcel.writeInt(parameter1);
+            rr.mParcel.writeInt(parameter2);
+        }
+
+        send(rr);
+    }
+
+    // DS: MTK
+    @Override
+    public void getRadioCapability(Message message) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_RADIO_CAPABILITY, message);
+        riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+        send(rr);
+    }
+
+    @Override
+    public void setRadioCapability(RadioCapability radioCapability, Message message) {
+        final RILRequest rr = RILRequest.obtain(RIL_REQUEST_SET_RADIO_CAPABILITY, message);
+        rr.mParcel.writeInt(radioCapability.getVersion());
+        rr.mParcel.writeInt(radioCapability.getSession());
+        rr.mParcel.writeInt(radioCapability.getPhase());
+        rr.mParcel.writeInt(radioCapability.getRadioAccessFamily());
+        rr.mParcel.writeString(radioCapability.getLogicalModemUuid());
+        rr.mParcel.writeInt(radioCapability.getStatus());
+        riljLog(rr.serialString() + "> " + requestToString(rr.mRequest) + " " + radioCapability.toString());
+        send(rr);
+    }
+
+    protected Object responseRadioCapability(Parcel parcel) {
+        int version = parcel.readInt();
+        int session = parcel.readInt();
+        int phase = parcel.readInt();
+        int rat = parcel.readInt();
+        String uuid = parcel.readString();
+        int status = parcel.readInt();
+        riljLog("responseRadioCapability: version= " + version + ", session=" + session + ", phase=" + phase + ", rat=" + rat + ", logicModemUuid=" + uuid + ", status=" + status);
+        return new RadioCapability(mInstanceId, session, phase, rat, uuid, status);
+    }
+
 }

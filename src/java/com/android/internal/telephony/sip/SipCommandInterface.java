@@ -589,5 +589,52 @@ class SipCommandInterface extends BaseCommands implements CommandsInterface {
     public void requestShutdown(Message result) {
     }
 
+    // MTK
+
+    @Override
+    public void iccGetATR(Message response) {
+    }
+
+    @Override
+    public void iccOpenChannelWithSw(String AID, Message result){
+    }
+
+    @Override
+    public void setTrm(int mode, Message result) {
+    }
+
+    @Override
+    public void setOnPlmnChangeNotification(Handler h, int what, Object obj) {
+    }
+
+    @Override
+    public void unSetOnPlmnChangeNotification(Handler h) {
+    }
+
+    @Override
+    public void setOnRegistrationSuspended(Handler h, int what, Object obj) {
+    }
+
+    @Override
+    public void unSetOnRegistrationSuspended(Handler h) {
+    }
+
+    @Override
+    public void setResumeRegistration(int sessionId, Message response) {
+    }
+
+    @Override
+    public void queryModemType(Message response) {
+    }
+
+    @Override
+    public void storeModemType(int modemType, Message response) {
+    }
+
+    @Override
+    public void setInitialAttachApn(String apn, String protocol, int authType, String username,
+            String password, String operatorNumeric, boolean canHandleIms, Message result) {
+    }
+
     public boolean needsOldRilFeature(String feature) { return false; }
 }

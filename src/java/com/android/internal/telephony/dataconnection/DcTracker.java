@@ -88,6 +88,9 @@ import com.android.internal.telephony.uicc.IccUtils;
 import com.android.internal.util.AsyncChannel;
 import com.android.internal.util.ArrayUtils;
 
+// MTK
+import com.mediatek.internal.telephony.dataconnection.FdManager;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
@@ -185,6 +188,9 @@ public final class DcTracker extends DcTrackerBase {
     private boolean mDeregistrationAlarmState = false;
     private PendingIntent mImsDeregistrationDelayIntent = null;
 
+    // MTK
+    protected FdManager mFdMgr;
+
     /* IWLAN and WWAN co-exist flag */
     private boolean mWwanIwlanCoexistFlag = false;
 
@@ -253,6 +259,9 @@ public final class DcTracker extends DcTrackerBase {
             filter.addAction(INTENT_RESTART_TRYSETUP_ALARM + '.' + apnContext.getApnType());
             mPhone.getContext().registerReceiver(mIntentReceiver, filter, null, mPhone);
         }
+
+        // MTK Fast Dormancy
+        mFdMgr = FdManager.getInstance(p);
 
         // Add Emergency APN to APN setting list by default to support EPDN in sim absent cases
         initEmergencyApnSetting();
@@ -869,6 +878,7 @@ public final class DcTracker extends DcTrackerBase {
         IccRecords r = mIccRecords.get();
         boolean recordsLoaded = false;
         if (r != null) {
+            log("isDataAllowed mIccRecords=IccRecords {" + r.toString() + "}");
             recordsLoaded = r.getRecordsLoaded();
             if (DBG) log("isDataAllowed getRecordsLoaded=" + recordsLoaded);
         }

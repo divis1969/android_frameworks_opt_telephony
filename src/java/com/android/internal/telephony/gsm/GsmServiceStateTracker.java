@@ -224,6 +224,20 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         mCi.setOnNITZTime(this, EVENT_NITZ_TIME, null);
         mCi.setOnRestrictedStateChanged(this, EVENT_RESTRICTED_STATE_CHANGED, null);
 
+        // MTK
+        mCi.registerForPsNetworkStateChanged(this, EVENT_PS_NETWORK_STATE_CHANGED, null);
+        // mCi.setInvalidSimInfo(this, EVENT_INVALID_SIM_INFO, null); //ALPS00248788
+
+        // mCi.registerForIccRefresh(this, EVENT_ICC_REFRESH, null);
+        /*
+        if (SystemProperties.get("ro.mtk_ims_support").equals("1")) {
+            mCi.registerForImsDisable(this, EVENT_IMS_DISABLED_URC, null);
+            mCi.registerForImsRegistrationInfo(this, EVENT_IMS_REGISTRATION_INFO, null);
+        }
+        if (SystemProperties.get("ro.mtk_femto_cell_support").equals("1"))
+            mCi.registerForFemtoCellInfo(this, EVENT_FEMTO_CELL_INFO, null);
+        */
+
         // system setting property AIRPLANE_MODE_ON is set in Settings.
         int airplaneMode = Settings.Global.getInt(
                 phone.getContext().getContentResolver(),
@@ -267,6 +281,11 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
         mCr.unregisterContentObserver(mAutoTimeObserver);
         mCr.unregisterContentObserver(mAutoTimeZoneObserver);
         mPhone.getContext().unregisterReceiver(mIntentReceiver);
+
+        // MTK
+        // mCi.unregisterForIccRefresh(this);
+        mCi.unregisterForPsNetworkStateChanged(this);
+
         super.dispose();
     }
 
@@ -324,6 +343,10 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 break;
 
             case EVENT_NETWORK_STATE_CHANGED:
+                pollState();
+                break;
+
+            case EVENT_PS_NETWORK_STATE_CHANGED:
                 pollState();
                 break;
 
@@ -720,6 +743,12 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                                     psc = Integer.parseInt(states[14], 16);
                                 }
                             }
+
+                            log("EVENT_POLL_STATE_REGISTRATION mSS getRilVoiceRadioTechnology:" + mSS.getRilVoiceRadioTechnology() +
+                                    ", regState:" + regState +
+                                    ", NewSS RilVoiceRadioTechnology:" + mNewSS.getRilVoiceRadioTechnology() +
+                                    ", lac:" + lac +
+                                    ", cid:" + cid);
                         } catch (NumberFormatException ex) {
                             loge("error parsing RegistrationState: " + ex);
                         }
@@ -783,12 +812,18 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                             if (states.length >= 4 && states[3] != null) {
                                 type = Integer.parseInt(states[3]);
                             }
-                            if ((states.length >= 5 ) &&
-                                    (regState == ServiceState.RIL_REG_STATE_DENIED)) {
-                                mNewReasonDataDenied = Integer.parseInt(states[4]);
+                            if (states.length >= 5 && states[4] != null) {
+                                log("<cell_data_speed_support> " + states[4]);
                             }
-                            if (states.length >= 6) {
-                                mNewMaxDataCalls = Integer.parseInt(states[5]);
+                            if (states.length >= 6 && states[5] != null) {
+                                log("<max_data_bearer_capability> " + states[5]);
+                            }
+                            if ((states.length >= 7) &&
+                                    (regState == ServiceState.RIL_REG_STATE_DENIED)) {
+                                mNewReasonDataDenied = Integer.parseInt(states[6]);
+                            }
+                            if (states.length >= 8) {
+                                mNewMaxDataCalls = Integer.parseInt(states[7]);
                             }
                         } catch (NumberFormatException ex) {
                             loge("error parsing GprsRegistrationState: " + ex);
