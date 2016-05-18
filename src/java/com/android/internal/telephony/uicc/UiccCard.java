@@ -898,10 +898,10 @@ public class UiccCard {
 
     public void update(Context c, CommandsInterface ci, IccCardStatus ics, boolean isUpdateSimInfo) {
         synchronized (mLock) {
-            if (mDestroyed) {
-                loge("Updated after destroyed! Fix me!");
-                return;
-            }
+//            if (mDestroyed) {
+//                loge("Updated after destroyed! Fix me!");
+//                return;
+//            }
             CardState oldState = mCardState;
             mCardState = ics.mCardState;
             mUniversalPinState = ics.mUniversalPinState;

@@ -124,9 +124,9 @@ public class RadioCapabilitySwitchUtil {
                 simType[i] = RadioCapabilitySwitchUtil.SIM_TYPE_OTHER;
             }
             logd("SimType[" + i + "]= " + strSimType[i] + ", simType[" + i + "]=" + simType[i]);
-            final int tmpMnc = TelephonyManager.getTelephonyProperty("gsm.sim.operator.numeric",
-                    SubscriptionManager.getSubId(i)[0], -1);  // getSubIdUsingPhoneId not implemented
-			strMnc[i] = tmpMnc < 0 ? "" : Integer.toString(tmpMnc);
+//            final int tmpMnc = TelephonyManager.getTelephonyProperty("gsm.sim.operator.numeric",
+//                    SubscriptionManager.getSubId(i)[0], -1);  // getSubIdUsingPhoneId not implemented
+            strMnc[i] = TelephonyManager.getTelephonyProperty(SubscriptionManager.getSubId(i)[0], "gsm.sim.operator.numeric","");
             logd("strMnc[" + i + "] from operator.numeric:" + strMnc[i]);
             if (strMnc[i].equals("")) {
                 if (i == 0) {

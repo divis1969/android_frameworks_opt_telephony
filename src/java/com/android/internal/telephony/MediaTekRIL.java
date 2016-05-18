@@ -224,13 +224,13 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
                 }
             }
 
-            if (strings[i] != null && (strings[i].equals("") || strings[i].equals(strings[i+2]))) {
-                Operators init = new Operators ();
-                String temp = init.unOptimizedOperatorReplace(strings[i+2]);
-                riljLog("lookup RIL responseOperatorInfos() " + strings[i+2] + " gave " + temp);
-                strings[i] = temp;
-                strings[i+1] = temp;
-            }
+//            if (strings[i] != null && (strings[i].equals("") || strings[i].equals(strings[i+2]))) {
+//                Operators init = new Operators ();
+//                String temp = init.unOptimizedOperatorReplace(strings[i+2]);
+//                riljLog("lookup RIL responseOperatorInfos() " + strings[i+2] + " gave " + temp);
+//                strings[i] = temp;
+//                strings[i+1] = temp;
+//            }
 
             // NOTE: We don't have the 5th element in MTK, and I don't know about
             // the cases that make this processing necessary. Disable for now.
@@ -392,32 +392,32 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
     }
 
     @Override
-    public void setLocalCallHold(int lchStatus) {
-        byte[] payload = new byte[]{(byte)(lchStatus & 0x7F)};
+    public void setLocalCallHold(boolean lchStatus) {
+        //byte[] payload = new byte[]{(byte)(lchStatus & 0x7F)};
         Rlog.d(RILJ_LOG_TAG, "setLocalCallHold: lchStatus is " + lchStatus);
 
         // sendOemRilRequestRaw(OEMHOOK_EVT_HOOK_SET_LOCAL_CALL_HOLD, 1, payload, null);
         Rlog.e(RILJ_LOG_TAG, "setLocalCallHold: stub!");
     }
 
-    @Override
-    public void getModemCapability(Message response) {
-        Rlog.d(RILJ_LOG_TAG, "GetModemCapability");
-        // sendOemRilRequestRaw(OEMHOOK_EVT_HOOK_GET_MODEM_CAPABILITY, 0, null, response);
-        Rlog.w(RILJ_LOG_TAG, "GetModemCapability: not really implemented!");
-        AsyncResult.forMessage(response, null, CommandException.fromRilErrno(REQUEST_NOT_SUPPORTED));
-        response.sendToTarget();
-    }
+//    @Override
+//    public void getModemCapability(Message response) {
+//        Rlog.d(RILJ_LOG_TAG, "GetModemCapability");
+//        // sendOemRilRequestRaw(OEMHOOK_EVT_HOOK_GET_MODEM_CAPABILITY, 0, null, response);
+//        Rlog.w(RILJ_LOG_TAG, "GetModemCapability: not really implemented!");
+//        AsyncResult.forMessage(response, null, CommandException.fromRilErrno(REQUEST_NOT_SUPPORTED));
+//        response.sendToTarget();
+//    }
 
-    @Override
-    public void updateStackBinding(int stack, int enable, Message response) {
-        byte[] payload = new byte[]{(byte)stack,(byte)enable};
-        Rlog.d(RILJ_LOG_TAG, "UpdateStackBinding: on Stack: " + stack +
-                ", enable/disable: " + enable);
-
-        // sendOemRilRequestRaw(OEMHOOK_EVT_HOOK_UPDATE_SUB_BINDING, 2, payload, response);
-        Rlog.e(RILJ_LOG_TAG, "UpdateStackBinding: stub!");
-    }
+//    @Override
+//    public void updateStackBinding(int stack, int enable, Message response) {
+//        byte[] payload = new byte[]{(byte)stack,(byte)enable};
+//        Rlog.d(RILJ_LOG_TAG, "UpdateStackBinding: on Stack: " + stack +
+//                ", enable/disable: " + enable);
+//
+//        // sendOemRilRequestRaw(OEMHOOK_EVT_HOOK_UPDATE_SUB_BINDING, 2, payload, response);
+//        Rlog.e(RILJ_LOG_TAG, "UpdateStackBinding: stub!");
+//    }
 
     @Override
     public void
@@ -629,7 +629,7 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_ENTER_SIM_PUK2: ret =  responseInts(p); break;
             case RIL_REQUEST_CHANGE_SIM_PIN: ret =  responseInts(p); break;
             case RIL_REQUEST_CHANGE_SIM_PIN2: ret =  responseInts(p); break;
-            case RIL_REQUEST_ENTER_DEPERSONALIZATION_CODE: ret =  responseInts(p); break;
+            case RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION: ret =  responseInts(p); break;
             case RIL_REQUEST_GET_CURRENT_CALLS: ret =  responseCallList(p); break;
             case RIL_REQUEST_DIAL: ret =  responseVoid(p); break;
             case RIL_REQUEST_GET_IMSI: ret =  responseString(p); break;
@@ -831,7 +831,7 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
 
             // IMS
             case RIL_REQUEST_SET_IMS_ENABLE: ret = responseVoid(p); break;
-            case RIL_REQUEST_SIM_GET_ATR: ret = responseString(p); break;
+            case RIL_REQUEST_SIM_GET_ATR_MTK: ret = responseString(p); break;
             // M: Fast Dormancy
             case RIL_REQUEST_SET_SCRI: ret = responseVoid(p); break;
             case RIL_REQUEST_SET_FD_MODE: ret = responseInts(p); break;
@@ -998,8 +998,8 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_UNSOL_SRVCC_STATE_NOTIFY: ret = responseInts(p); break;
             case RIL_UNSOL_HARDWARE_CONFIG_CHANGED: ret = responseHardwareConfig(p); break;
             // fxxk this conflicts with RIL_UNSOL_RADIO_CAPABILITY...
-            case RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE:
-                     ret = responseSetPhoneRatChanged(p); break;
+//            case RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE:
+//                     ret = responseSetPhoneRatChanged(p); break;
             /* M: call control part start */
             case RIL_UNSOL_CALL_FORWARDING: ret = responseInts(p); break;
             case RIL_UNSOL_CRSS_NOTIFICATION: ret = responseCrssNotification(p); break;
@@ -1104,14 +1104,14 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
                 }
                 break;
 
-            case RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE:
-                if (RILJ_LOGD) unsljLogRet(response, ret);
-                riljLog("mPhoneRatFamilyreg size :" + mPhoneRatFamilyChangedRegistrants.size());
-                if (mPhoneRatFamilyChangedRegistrants != null) {
-                    mPhoneRatFamilyChangedRegistrants.notifyRegistrants(
-                            new AsyncResult(null, ret, null));
-                }
-                break;
+//            case RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE:
+//                if (RILJ_LOGD) unsljLogRet(response, ret);
+//                riljLog("mPhoneRatFamilyreg size :" + mPhoneRatFamilyChangedRegistrants.size());
+//                if (mPhoneRatFamilyChangedRegistrants != null) {
+//                    mPhoneRatFamilyChangedRegistrants.notifyRegistrants(
+//                            new AsyncResult(null, ret, null));
+//                }
+//                break;
 
             case RIL_UNSOL_PHB_READY_NOTIFICATION:
                 if (RILJ_LOGD) unsljLogRet(response, ret);
@@ -1310,7 +1310,7 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_ENTER_SIM_PUK2: return "ENTER_SIM_PUK2";
             case RIL_REQUEST_CHANGE_SIM_PIN: return "CHANGE_SIM_PIN";
             case RIL_REQUEST_CHANGE_SIM_PIN2: return "CHANGE_SIM_PIN2";
-            case RIL_REQUEST_ENTER_DEPERSONALIZATION_CODE: return "ENTER_DEPERSONALIZATION_CODE";
+            case RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION: return "RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION";
             case RIL_REQUEST_GET_CURRENT_CALLS: return "GET_CURRENT_CALLS";
             case RIL_REQUEST_DIAL: return "DIAL";
             case RIL_REQUEST_GET_IMSI: return "GET_IMSI";
@@ -1498,7 +1498,7 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_STK_EVDL_CALL_BY_AP: return "RIL_REQUEST_STK_EVDL_CALL_BY_AP";
             case RIL_REQUEST_QUERY_MODEM_TYPE: return "RIL_REQUEST_QUERY_MODEM_TYPE";
             case RIL_REQUEST_STORE_MODEM_TYPE: return "RIL_REQUEST_STORE_MODEM_TYPE";
-            case RIL_REQUEST_SIM_GET_ATR: return "SIM_GET_ATR";
+            case RIL_REQUEST_SIM_GET_ATR_MTK: return "SIM_GET_ATR_MTK";
             case RIL_REQUEST_SIM_OPEN_CHANNEL_WITH_SW: return "SIM_OPEN_CHANNEL_WITH_SW";
             //VoLTE
             case RIL_REQUEST_SETUP_DEDICATE_DATA_CALL: return "RIL_REQUEST_SETUP_DEDICATE_DATA_CALL";
@@ -1615,15 +1615,15 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
 
         // NOTE: the original code seemingly has some nontrivial SpnOverride
         // modifications, so I'm not going to port that.
-        if (response.length > 2 && response[2] != null) {
-            if (response[0] != null && (response[0].equals("") || response[0].equals(response[2]))) {
-	        Operators init = new Operators ();
-	        String temp = init.unOptimizedOperatorReplace(response[2]);
-	        riljLog("lookup RIL responseOperator() " + response[2] + " gave " + temp + " was " + response[0] + "/" + response[1] + " before.");
-	        response[0] = temp;
-	        response[1] = temp;
-            }
-        }
+//        if (response.length > 2 && response[2] != null) {
+//            if (response[0] != null && (response[0].equals("") || response[0].equals(response[2]))) {
+//	        Operators init = new Operators ();
+//	        String temp = init.unOptimizedOperatorReplace(response[2]);
+//	        riljLog("lookup RIL responseOperator() " + response[2] + " gave " + temp + " was " + response[0] + "/" + response[1] + " before.");
+//	        response[0] = temp;
+//	        response[1] = temp;
+//            }
+//        }
 
         return response;
     }
@@ -1689,8 +1689,8 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
             case RIL_UNSOL_ON_SS: return "UNSOL_ON_SS";
             case RIL_UNSOL_STK_CC_ALPHA_NOTIFY: return "UNSOL_STK_CC_ALPHA_NOTIFY";
             case RIL_UNSOL_STK_SEND_SMS_RESULT: return "RIL_UNSOL_STK_SEND_SMS_RESULT";
-            case RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE:
-                    return "RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE";
+//            case RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE:
+//                    return "RIL_UNSOL_SET_PHONE_RAT_FAMILY_COMPLETE";
             /* M: call control part start */
             case RIL_UNSOL_CALL_FORWARDING: return "UNSOL_CALL_FORWARDING";
             case RIL_UNSOL_CRSS_NOTIFICATION: return "UNSOL_CRSS_NOTIFICATION";
@@ -1934,23 +1934,25 @@ public class MediaTekRIL extends RIL implements CommandsInterface {
     */
 
     @Override
-    public void setUiccSubscription(int slotId, int appIndex, int subId,
-				    int subStatus, Message result) {
-	    if (RILJ_LOGD) riljLog("setUiccSubscription" + slotId + " " + appIndex + " " + subId + " " + subStatus);
+//    public void setUiccSubscription(int slotId, int appIndex, int subId,
+//				    int subStatus, Message result) {
+    public void setUiccSubscription(int appIndex, boolean activate, Message response) {
+//	    if (RILJ_LOGD) riljLog("setUiccSubscription" + slotId + " " + appIndex + " " + subId + " " + subStatus);
+	    if (RILJ_LOGD) riljLog("setUiccSubscription " + appIndex + " " + activate);
 
 	    // Fake response (note: should be sent before mSubscriptionStatusRegistrants or
 	    // SubscriptionManager might not set the readiness correctly)
-	    AsyncResult.forMessage(result, 0, null);
-	    result.sendToTarget();
+	    AsyncResult.forMessage(response, 0, null);
+	    response.sendToTarget();
 
 	    // TODO: Actually turn off/on the radio (and don't fight with the ServiceStateTracker)
-	    if (subStatus == 1 /* ACTIVATE */) {
+	    if (activate /* ACTIVATE */) {
 		    // Subscription changed: enabled
 		    if (mSubscriptionStatusRegistrants != null) {
 			    mSubscriptionStatusRegistrants.notifyRegistrants(
 									     new AsyncResult (null, new int[] {1}, null));
 		    }
-	    } else if (subStatus == 0 /* DEACTIVATE */) {
+	    } else {
 		    // Subscription changed: disabled
 		    if (mSubscriptionStatusRegistrants != null) {
 			    mSubscriptionStatusRegistrants.notifyRegistrants(

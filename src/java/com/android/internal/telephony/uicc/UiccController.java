@@ -19,6 +19,7 @@ package com.android.internal.telephony.uicc;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.BroadcastReceiver;
+import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.AsyncResult;
 import android.os.Bundle;
@@ -177,7 +178,7 @@ public class UiccController extends Handler {
             // TODO remove this once modem correctly notifies the unsols
             if (DECRYPT_STATE.equals(SystemProperties.get("vold.decrypt")) &&
                     (mCis[i].getRilVersion() >= 9) || radioApmSimNotPwdn ||
-					SystemProperties.get("gsm.version.ril-impl").startsWith("mtk")) {
+                    SystemProperties.get("gsm.version.ril-impl").startsWith("mtk")) {
                 // Reading ICC status in airplane mode is only supported in QCOM
                 // RILs when this property is set to true
                 // and MTK RILs

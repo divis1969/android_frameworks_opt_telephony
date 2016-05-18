@@ -118,7 +118,6 @@ public interface IccConstants {
     // ALPS00302702 RAT balancing
     static public final int EF_RAT = 0x4F36; // ADF(USIM)/7F66/5F30/4F36
     static final String DF_USIM = "7FFF";
-    static final int EF_GID2 = 0x6F3F;
 
     // MTK-START [ALPS00092673] Orange feature merge back added by mtk80589 in 2011.11.15
     /*

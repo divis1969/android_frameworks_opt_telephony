@@ -1792,9 +1792,10 @@ public abstract class DcTrackerBase extends Handler {
         ApnSetting iaApnSetting = null;
         ApnSetting defaultApnSetting = null;
         ApnSetting firstApnSetting = null;
-        String operator = (r != null) ? r.getOperatorNumeric(): "";
+//        String operator = (r != null) ? r.getOperatorNumeric(): "";
 
-        log("setInitialApn: E operator=" + operator + " preferredApn=" + preferredApn);
+//        log("setInitialApn: E operator=" + operator + " preferredApn=" + preferredApn);
+        log("setInitialApn: E preferredApn=" + preferredApn);
 
         if (apnList != null && !apnList.isEmpty()) {
             firstApnSetting = apnList.get(0);
@@ -1847,7 +1848,7 @@ public abstract class DcTrackerBase extends Handler {
             mPhone.mCi.setInitialAttachApn(initialAttachApnSetting.apn,
                     initialAttachApnSetting.protocol, initialAttachApnSetting.authType,
                     initialAttachApnSetting.user, initialAttachApnSetting.password,
-                    operator, initialAttachApnSetting.canHandleType(PhoneConstants.APN_TYPE_IMS),
+                    /*operator*/"", initialAttachApnSetting.canHandleType(PhoneConstants.APN_TYPE_IMS),
                     null);
         }
     }

@@ -2294,9 +2294,5 @@ public interface CommandsInterface {
 
     // DS: MTK
     public int getSupportedRadioAccessFamily();
-    public void getRadioCapability(Message result);
-    public void setRadioCapability(RadioCapability caps, Message result);
-    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o);
-    public void unregisterForRadioCapabilityChanged(Handler handler);
 
 }

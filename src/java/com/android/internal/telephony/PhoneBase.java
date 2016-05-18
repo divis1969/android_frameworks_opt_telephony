@@ -736,18 +736,6 @@ public abstract class PhoneBase extends Handler implements Phone {
                 mPhoneRatFamilyChangedRegistrants.notifyRegistrants((AsyncResult) msg.obj);
                 break;
 
-            case EVENT_GET_RADIO_CAPABILITY:
-                ar = (AsyncResult)msg.obj;
-                if (ar.exception != null) {
-                    Rlog.d("PhoneBase", "get phone radio capability fail,no need to change mRadioAccessFamily");
-                }
-                else {
-                    RadioCapability radioCapability = (RadioCapability)ar.result;
-                    mRadioAccessFamily = radioCapability.getRadioAccessFamily();
-                    Rlog.d("PhoneBase", "EVENT_GET_RADIO_CAPABILITY :phone " + mPhoneId + ", RAF : " + mRadioAccessFamily);
-                }
-                break;
-
             default:
                 throw new RuntimeException("unexpected event not handled");
         }
@@ -2954,25 +2942,9 @@ public abstract class PhoneBase extends Handler implements Phone {
     }
 
     // DS: MTK
-    public int getRadioAccessFamily() {
-        return mRadioAccessFamily;
-    }
-
     public void setRadioAccessFamily(final int mRadioAccessFamily) {
         Rlog.w("PhoneBase", "setRadioAccessFamily: " + mRadioAccessFamily);
         this.mRadioAccessFamily = mRadioAccessFamily;
-    }
-
-    public void setRadioCapability(RadioCapability radioCapability, Message message) {
-        mCi.setRadioCapability(radioCapability, message);
-    }
-
-    public void registerForRadioCapabilityChanged(Handler handler, int n, Object o) {
-        mCi.registerForRadioCapabilityChanged(handler, n, o);
-    }
-
-    public void unregisterForRadioCapabilityChanged(Handler handler) {
-        mCi.unregisterForRadioCapabilityChanged(this);
     }
 
 }
