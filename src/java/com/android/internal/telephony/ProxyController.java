@@ -502,4 +502,15 @@ public class ProxyController {
         }
     }
 
+    // Meizu
+    public int getRadioAccessFamily(int phoneId) {
+        int radioAccessFamily;
+        if (phoneId >= mProxyPhones.length) {
+            radioAccessFamily = 1;
+        } else {
+            radioAccessFamily = mProxyPhones[phoneId].getRadioAccessFamily();
+        }
+        return radioAccessFamily;
+    }
+
 }
